@@ -1,0 +1,228 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  font-family: 'Outfit', system-ui, sans-serif;
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.9);
+  background-color: #050508;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Brand colors */
+  --blue:    #4F8EF7;
+  --purple:  #8B5CF6;
+  --violet:  #A855F7;
+  --indigo:  #6366F1;
+  --pink:    #EC4899;
+  --neon:    #00FF88;
+
+  /* Backgrounds */
+  --bg-primary:   #050508;
+  --bg-surface:   #0D0D14;
+  --bg-card:      rgba(255,255,255,0.04);
+  --bg-glass:     rgba(255,255,255,0.06);
+
+  /* Borders */
+  --border-subtle: rgba(255,255,255,0.08);
+  --border-glow:   rgba(139,92,246,0.4);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-primary);
+  overflow-x: hidden;
+}
+
+#root {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  text-align: left;
+  min-height: 100svh;
+  background-color: var(--bg-primary);
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Fix option colors universally for dashboard */
+select option {
+  color: #000000;
+  background-color: #ffffff;
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: linear-gradient(135deg, #4F8EF7 0%, #8B5CF6 50%, #EC4899 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow button utility */
+.btn-glow {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+.btn-glow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #4F8EF7,#8B5CF6);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.btn-glow:hover::before { opacity: 0.15; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #0a0a0f; }
+::-webkit-scrollbar-thumb { background: #4F8EF7; border-radius: 2px; }
+
+/* Section heading */
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8B5CF6;
+  padding: 6px 16px;
+  border: 1px solid rgba(139,92,246,0.3);
+  border-radius: 100px;
+  background: rgba(139,92,246,0.08);
+  margin-bottom: 16px;
+}
+
+/* Particle canvas */
+#particle-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Tilt card */
+.tilt-card {
+  transform-style: preserve-3d;
+  transition: transform 0.1s ease;
+}
+
+/* Neon glow keyframe */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(139,92,246,0.4), 0 0 60px rgba(139,92,246,0.1); }
+  50%       { box-shadow: 0 0 40px rgba(139,92,246,0.7), 0 0 80px rgba(139,92,246,0.3); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33%       { transform: translateY(-12px) rotate(1deg); }
+  66%       { transform: translateY(6px) rotate(-0.5deg); }
+}
+
+@keyframes gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% center; }
+  to   { background-position: 200% center; }
+}
+
+.animate-float       { animation: float 6s ease-in-out infinite; }
+.animate-float-delay { animation: float 6s ease-in-out infinite 2s; }
+.animate-float-slow  { animation: float 8s ease-in-out infinite 1s; }
+.animate-pulse-glow  { animation: pulse-glow 3s ease-in-out infinite; }
+.animate-spin-slow   { animation: spin-slow 20s linear infinite; }
+
+.shimmer-btn {
+  background: linear-gradient(90deg, #4F8EF7, #8B5CF6, #EC4899, #8B5CF6, #4F8EF7);
+  background-size: 200% auto;
+  animation: shimmer 3s linear infinite;
+}
+
+/* ───────────────────────────────────────────────────────── */
+/* PRINT STYLES */
+/* ───────────────────────────────────────────────────────── */
+@media print {
+  @page {
+    size: A5 portrait;
+    margin: 10mm;
+  }
+  
+  /* Hide everything by default when printing */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Only show the invoice and payslip print containers */
+  #invoice-print, #invoice-print *,
+  #payslip-print, #payslip-print * {
+    visibility: visible;
+  }
+  
+  /* Position it perfectly for the page */
+  #invoice-print, #payslip-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Compress invoice to fit many items on one A5 page */
+  #invoice-print > div {
+    padding: 12px 16px !important;
+  }
+  #invoice-print table th,
+  #invoice-print table td {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+  }
+  #invoice-print .invoice-total-row {
+    padding: 8px 12px !important;
+    margin-bottom: 4px !important;
+  }
+  #invoice-print .invoice-total-row span {
+    font-size: 14px !important;
+  }
+
+  /* Hide print actions button row */
+  #invoice-print .print-actions,
+  #payslip-print .print-actions {
+    display: none !important;
+  }
+}
+
