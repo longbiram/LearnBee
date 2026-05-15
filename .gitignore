@@ -8,6 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+ByClass
+desktop-tutorial
+LearnBeeErp
 dist
 dist-ssr
 *.local
@@ -16,6 +19,7 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .idea
+.env
 .DS_Store
 *.suo
 *.ntvs*
