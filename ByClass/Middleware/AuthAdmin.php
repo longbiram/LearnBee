@@ -1,0 +1,2 @@
+<?php
+// AuthAdmin.php placeholder

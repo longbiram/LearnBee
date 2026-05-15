@@ -1,0 +1,2 @@
+<?php
+// AuthTeacher.php placeholder

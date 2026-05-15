@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Student Admission Form</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      padding: 20px;
+    }
+    .form-container {
+      background: #fff;
+      padding: 25px;
+      border-radius: 10px;
+      max-width: 800px;
+      margin: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .form-container h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    .form-group label {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    .form-row {
+      display: flex;
+      gap: 20px;
+    }
+    .form-row .form-group {
+      flex: 1;
+    }
+    button {
+      background: #007bff;
+      color: #fff;
+      border: none;
+      padding: 10px 25px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 20px;
+      display: block;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<div class="form-container">
+  <h2>Student Admission Form</h2>
+  <form id="admissionForm" action="submit_form.php" method="POST">
+
+    <div class="form-group">
+      <label for="admissionClass">Admission Sought For (Class)</label>
+      <select id="admissionClass" name="admission_class" required>
+        <option value="">Select Class</option>
+        <option>Nursery</option>
+        <option>LKG</option>
+        <option>UKG</option>
+        <option>Class 1</option>
+        <option>Class 2</option>
+        <option>Class 3</option>
+        <option>Class 4</option>
+        <option>Class 5</option>
+        <option>Class 6</option>
+        <option>Class 7</option>
+        <option>Class 8</option>
+        <option>Class 9</option>
+        <option>Class 10</option>
+        <option>Class 11 (Science)</option>
+        <option>Class 11 (Commerce)</option>
+        <option>Class 11 (Arts)</option>
+        <option>Class 12 (Science)</option>
+        <option>Class 12 (Commerce)</option>
+        <option>Class 12 (Arts)</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="studentName">Full Name of Student</label>
+        <input type="text" id="studentName" name="student_name" required>
+      </div>
+      <div class="form-group">
+        <label for="dob">Date of Birth</label>
+        <input type="date" id="dob" name="dob" required>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="gender">Gender</label>
+        <select id="gender" name="gender" required>
+          <option value="">Select</option>
+          <option>Male</option>
+          <option>Female</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="bloodGroup">Blood Group</label>
+        <select id="bloodGroup" name="blood_group">
+          <option value="">Select</option>
+          <option>A+</option>
+          <option>A-</option>
+          <option>B+</option>
+          <option>B-</option>
+          <option>AB+</option>
+          <option>AB-</option>
+          <option>O+</option>
+          <option>O-</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="aadhar">Aadhar Number</label>
+      <input type="text" id="aadhar" name="aadhar_number" maxlength="12">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="religion">Religion</label>
+        <input type="text" id="religion" name="religion">
+      </div>
+      <div class="form-group">
+        <label for="caste">Caste / Category</label>
+        <select id="caste" name="category">
+          <option>General</option>
+          <option>OBC</option>
+          <option>SC</option>
+          <option>ST</option>
+          <option>EWS</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="address">Residential Address</label>
+      <textarea id="address" name="address" rows="3" required></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="city">City</label>
+        <input type="text" id="city" name="city">
+      </div>
+      <div class="form-group">
+        <label for="state">State</label>
+        <input type="text" id="state" name="state">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="pincode">Pincode</label>
+      <input type="text" id="pincode" name="pincode" maxlength="6">
+    </div>
+
+    <div class="form-group">
+      <label for="fatherName">Father's Name</label>
+      <input type="text" id="fatherName" name="father_name" required>
+    </div>
+
+    <div class="form-group">
+      <label for="motherName">Mother's Name</label>
+      <input type="text" id="motherName" name="mother_name" required>
+    </div>
+
+    <div class="form-group">
+      <label for="occupation">Parent's Occupation</label>
+      <input type="text" id="occupation" name="parent_occupation">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="mobile">Mobile Number</label>
+        <input type="text" id="mobile" name="mobile" maxlength="10" required>
+      </div>
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="lastSchool">Last School Attended (if any)</label>
+      <input type="text" id="lastSchool" name="last_school">
+    </div>
+
+    <div class="form-group">
+      <label for="transferCertificate">Transfer Certificate Number (if applicable)</label>
+      <input type="text" id="transferCertificate" name="tc_number">
+    </div>
+
+    <div class="form-group">
+      <label for="declaration">
+        <input type="checkbox" id="declaration" name="declaration" required>
+        I hereby declare that the above information is true and correct to the best of my knowledge.
+      </label>
+    </div>
+
+    <button type="submit">Submit Admission Form</button>
+  </form>
+</div>
+
+</body>
+</html>

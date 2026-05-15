@@ -6,7 +6,7 @@ import { useErpStaff } from '../../hooks/useErpAcademics';
 import {
   getClassTeachers, upsertClassTeacher, removeClassTeacher,
 } from '../../hooks/useErpExams';
-import { Award, Loader2, Save, Trash2, UserCheck, X } from 'lucide-react';
+import { Award, Loader2, Save, UserCheck, X } from 'lucide-react';
 
 const ACCENT = '#7c3aed';
 

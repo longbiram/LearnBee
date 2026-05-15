@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import AdminLayout from '../../components/AdminLayout';
-import { Clock, Search, Calendar, ChevronRight, Loader2, Save, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Clock, Search, Calendar, ChevronRight, Loader2, Save, XCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useErpClasses } from '../../hooks/useErpAcademics';
 import { useStudents } from '../../hooks/useErpStudents';
-import { useErpAttendance, type AttendanceRecord } from '../../hooks/useErpAttendance';
+import { useErpAttendance } from '../../hooks/useErpAttendance';
 
 const statusStyle: Record<string, { bg: string; color: string; label: string }> = {
   present: { bg: '#dcfce7', color: '#16a34a', label: 'Present'  },
@@ -12,6 +12,13 @@ const statusStyle: Record<string, { bg: string; color: string; label: string }> 
   late:    { bg: '#fef9c3', color: '#ca8a04', label: 'Late'     },
   leave:   { bg: '#dbeafe', color: '#2563eb', label: 'On Leave' },
 };
+
+interface ClassSectionItem {
+  id: string;
+  classId: string;
+  className: string;
+  section: string | null;
+}
 
 export default function Attendance() {
   const { schoolId } = useAuth();
@@ -24,12 +31,13 @@ export default function Attendance() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Flatten classes into class-section pairs for the sidebar
-  const classSectionList = useMemo(() => {
-    return classes.flatMap(c => 
+  const classSectionList = useMemo<ClassSectionItem[]>(() => {
+    const list: ClassSectionItem[] = classes.flatMap(c => 
       (c.sections && c.sections.length > 0) 
-        ? c.sections.map(s => ({ id: `${c.id}-${s}`, classId: c.id, className: c.name, section: s }))
-        : [{ id: `${c.id}-none`, classId: c.id, className: c.name, section: null }]
-    ).sort((a, b) => a.className.localeCompare(b.className, undefined, { numeric: true }));
+        ? c.sections.map((s: string) => ({ id: `${c.id}-${s}`, classId: c.id, className: c.name, section: s as string | null }))
+        : [{ id: `${c.id}-none`, classId: c.id, className: c.name, section: null as string | null }]
+    );
+    return list.sort((a, b) => a.className.localeCompare(b.className, undefined, { numeric: true }));
   }, [classes]);
 
   // Set default selection
@@ -74,7 +82,7 @@ export default function Attendance() {
   }, [records, students]);
 
   // Handlers
-  const handleMark = (studentId: string, status: string) => {
+  const handleMark = (studentId: string) => {
     setLocalAttendance(prev => {
       const currentStatus = prev[studentId]?.status || 'present';
       const newStatus = currentStatus === 'absent' ? 'present' : 'absent';
@@ -94,7 +102,7 @@ export default function Attendance() {
     const payload = students.map(s => ({
       student_id: s.id,
       status: localAttendance[s.id]?.status || 'present',
-      time: localAttendance[s.id]?.time || null,
+      time: localAttendance[s.id]?.time || undefined,
     }));
     await saveAttendance(payload);
     alert('Attendance saved successfully!');
@@ -296,7 +304,7 @@ export default function Attendance() {
                         <td style={{ padding: '14px 20px' }}>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button 
-                              onClick={() => handleMark(s.id, 'absent')}
+                              onClick={() => handleMark(s.id)}
                               style={{ 
                                 padding: '6px 16px', borderRadius: 8, 
                                 border: '1px solid #e2e8f0', 

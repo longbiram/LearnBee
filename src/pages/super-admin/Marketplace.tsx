@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import SuperAdminLayout from '../../components/layout/SuperAdminLayout';
-import { Package, Upload, Plus, Search, Trash2, Edit2, ExternalLink, ShieldCheck, Globe, Clock, Download, X, Loader2, ArrowUpCircle, History } from 'lucide-react';
+import { Package, Upload, Plus, Search, Trash2, Edit2, ShieldCheck, Globe, Clock, Download, X, Loader2, ArrowUpCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 

@@ -123,7 +123,7 @@ export default function TeacherRoutine() {
                 </tr>
               </thead>
               <tbody>
-                {timeSlots.map((slot, pi) => (
+                {timeSlots.map((slot) => (
                   <tr key={`${slot.startTime}-${slot.endTime}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', borderRight: '1px solid #f1f5f9' }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{slot.label}</div>

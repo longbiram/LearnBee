@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '../../components/AdminLayout';
-import { ShoppingBag, Package, Download, CheckCircle2, Play, Pause, Trash2, Loader2, Search } from 'lucide-react';
+import { Package, Download, CheckCircle2, Play, Pause, Trash2, Loader2, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
 import { motion } from 'framer-motion';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export default function SchoolApps() {
-  const { user } = useAuth();
   const [marketplaceModules, setMarketplaceModules] = useState<any[]>([]);
   const [installedModules, setInstalledModules] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);

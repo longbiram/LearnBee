@@ -1,0 +1,2 @@
+<?php
+// UserController.php placeholder

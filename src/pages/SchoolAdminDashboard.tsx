@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useStudents } from '../hooks/useErpStudents';
 import { useErpClasses, useErpStaff, useSchoolInfo, getNotices, getFeeCollections, getInventoryStats, getStaffAttendance, getNotifications, markNotificationsRead } from '../hooks/useErpAcademics';
 import {
-  GraduationCap, LayoutDashboard, Users, BookOpen, UserCheck,
+  LayoutDashboard, Users, BookOpen, UserCheck,
   DollarSign, CalendarDays, Bell, MessageSquare, Settings, LogOut,
   Search, ChevronDown, ChevronRight, TrendingUp,
   Menu, X, Clock, BarChart2, Package, Banknote, ShoppingBag,

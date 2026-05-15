@@ -84,7 +84,8 @@ Deno.serve(async (req) => {
         totalTicketsResult,
         resolvedTicketsResult,
         created24hResult,
-        resolved24hResult
+        resolved24hResult,
+        profilesResult
       ] = await Promise.all([
         supabaseAdmin.from('schools').select('*').order('created_at', { ascending: false }),
         supabaseAdmin.from('erp_students').select('*', { count: 'exact', head: true }),
@@ -94,6 +95,7 @@ Deno.serve(async (req) => {
         supabaseAdmin.from('support_tickets').select('*', { count: 'exact', head: true }).eq('status', 'resolved'),
         supabaseAdmin.from('support_tickets').select('*', { count: 'exact', head: true }).gte('created_at', last24h),
         supabaseAdmin.from('support_tickets').select('*', { count: 'exact', head: true }).eq('status', 'resolved').gte('updated_at', last24h),
+        supabaseAdmin.from('profiles').select('role, status'),
       ]);
 
       const schools = schoolsResult.data || [];
@@ -104,11 +106,24 @@ Deno.serve(async (req) => {
       const totalSent = (totalTicketsResult.count || 0) + (resolvedTicketsResult.count || 0);
       const sent24h = (created24hResult.count || 0) + (resolved24hResult.count || 0);
 
+      const profiles = profilesResult.data || [];
+      const activeUsersCount = profiles.filter(p => p.status === 'active').length;
+      const totalUsersCount = profiles.length;
+      const roleBreakdown = {
+        admins: profiles.filter(p => p.role === 'super_admin' || p.role === 'admin' || p.role === 'school_admin').length,
+        teachers: profiles.filter(p => p.role === 'teacher').length,
+        students: profiles.filter(p => p.role === 'student').length,
+        staff: profiles.filter(p => p.role === 'accountant' || p.role === 'clerk' || p.role === 'librarian').length,
+      };
+
       return new Response(JSON.stringify({
         totalSchools: schools.length,
         activeSchools: schools.filter(s => s.status === 'active').length,
         totalStudents: studentsCountResult.count || 0,
         mrr,
+        activeUsers: activeUsersCount,
+        totalUsers: totalUsersCount,
+        roleBreakdown,
         recentSchools: schools.slice(0, 5),
         recentPayments: paymentsResult.data || [],
         recentTickets: ticketsResult.data || [],

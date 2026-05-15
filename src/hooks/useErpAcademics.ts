@@ -57,6 +57,7 @@ export interface SchoolInfo {
   latitude: number | null;
   longitude: number | null;
   subscription_plan?: string | null;
+  theme_color?: string | null;
   raw_details?: any;
 }
 

@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, User, Phone, Building, MapPin, ArrowRight, Check } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, User, Phone, Building, MapPin, ArrowRight, Check, AlertCircle, Loader2 } from 'lucide-react';
 import learnBeeLogo from '../assets/learnbeelogo.png';
+import { supabase } from '../lib/supabase';
+
 const perks = [
   '14-day free trial, no credit card',
   'Full access to all ERP features',
@@ -15,11 +17,140 @@ export default function Signup() {
   const [step, setStep] = useState(1);
   const navigate = useNavigate();
 
+  // Step 1: User Account State
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+
+  // Step 2: School State
+  const [schoolName, setSchoolName] = useState('');
+  const [schoolAddress, setSchoolAddress] = useState('');
+  const [studentRange, setStudentRange] = useState('');
+
+  // Status & Feedback States
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Auto-generate safe and clean school subdomain/code from school name
+  const generateSchoolCode = (name: string) => {
+    const cleanName = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .slice(0, 15);
+    const randomId = Math.floor(100 + Math.random() * 900); // Guarantees 3 digits uniqueness
+    return `${cleanName}${randomId}`;
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+
+    let createdSchoolId: string | null = null;
+
+    try {
+      // 1. Generate unique school code
+      const schoolCode = generateSchoolCode(schoolName);
+
+      // 2. Map student range to max_students field
+      let maxStudents = 300;
+      if (studentRange === '1–100') maxStudents = 100;
+      else if (studentRange === '101–300') maxStudents = 300;
+      else if (studentRange === '301–1000') maxStudents = 1000;
+      else if (studentRange === '1001–5000') maxStudents = 5000;
+      else if (studentRange === '5000+') maxStudents = 10000;
+
+      // 3. Insert the school row into the database first (Allow insert during onboarding policy is active)
+      const { data: schoolData, error: schoolError } = await supabase
+        .from('schools')
+        .insert([{
+          name: schoolName,
+          school_code: schoolCode,
+          address: schoolAddress,
+          admin_name: `${firstName} ${lastName}`,
+          admin_email: email,
+          contact_phone: phone,
+          subscription_plan: 'free',
+          max_students: maxStudents,
+          status: 'active'
+        }])
+        .select()
+        .single();
+
+      if (schoolError) {
+        throw new Error(`School onboarding failed: ${schoolError.message}`);
+      }
+
+      if (!schoolData) {
+        throw new Error('School onboarding failed: institution record was not created.');
+      }
+
+      createdSchoolId = schoolData.id;
+
+      // 4. Sign up the administrator user in Supabase Auth
+      // The trigger 'on_auth_user_created' automatically maps metadata into 'public.profiles'
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: `${firstName} ${lastName}`,
+            role: 'school_admin',
+            school_id: createdSchoolId,
+          }
+        }
+      });
+
+      if (authError) {
+        // Rollback school entry if user registration fails (to avoid orphan records)
+        if (createdSchoolId) {
+          await supabase.from('schools').delete().eq('id', createdSchoolId);
+        }
+        throw authError;
+      }
+
+      // 5. Seamless sign-in & redirection
+      if (authData.session) {
+        // Auto-logged in
+        navigate('/school-admin', { replace: true });
+      } else {
+        // Attempt explicit login if session is not immediately available
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (signInError) {
+          // If explicit login fails because of required email verification
+          setError(`Account successfully created! Please check your inbox at ${email} to verify and activate your school admin profile before signing in.`);
+          setStep(1); // Reset to account step to display correct context
+        } else if (signInData.session) {
+          navigate('/school-admin', { replace: true });
+        } else {
+          // Fallback if email needs validation
+          setError(`Almost there! A verification email has been sent to ${email}. Please verify your email to log in and access your school workspace.`);
+          setStep(1);
+        }
+      }
+
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred during signup.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div style={{
       minHeight:'100vh', background:'#050508',
       display:'flex', fontFamily:'Outfit, system-ui, sans-serif', overflow:'hidden',
     }}>
+      <style>{`
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+      `}</style>
+
       {/* Left panel */}
       <div className="hidden lg:flex" style={{
         width:'42%', background:'linear-gradient(160deg,#09091a 0%,#0f0820 100%)',
@@ -115,37 +246,80 @@ export default function Signup() {
           {step === 1 ? (
             <form onSubmit={e => { e.preventDefault(); setStep(2); }} style={{ display:'flex', flexDirection:'column', gap:16 }}>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-                {[{ icon:User, label:'First Name', ph:'Priya' }, { icon:User, label:'Last Name', ph:'Sharma' }].map(({ icon:Icon, label, ph }) => (
-                  <div key={label}>
-                    <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>{label}</label>
-                    <div style={{ position:'relative' }}>
-                      <Icon size={15} color="rgba(255,255,255,0.25)" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}/>
-                      <input placeholder={ph} required style={{ width:'100%', padding:'11px 12px 11px 36px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:11, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
-                        onFocus={e => e.target.style.borderColor='rgba(139,92,246,0.6)'}
-                        onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.09)'}/>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {[
-                { icon:Mail, label:'Work Email', ph:'admin@school.com', type:'email' },
-                { icon:Phone, label:'Phone Number', ph:'+91 60028 79151', type:'tel' },
-              ].map(({ icon:Icon, label, ph, type }) => (
-                <div key={label}>
-                  <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>{label}</label>
+                <div>
+                  <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>First Name</label>
                   <div style={{ position:'relative' }}>
-                    <Icon size={15} color="rgba(255,255,255,0.25)" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}/>
-                    <input type={type} placeholder={ph} required style={{ width:'100%', padding:'11px 12px 11px 38px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:11, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                    <User size={15} color="rgba(255,255,255,0.25)" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}/>
+                    <input 
+                      placeholder="Priya" 
+                      required 
+                      value={firstName}
+                      onChange={e => setFirstName(e.target.value)}
+                      style={{ width:'100%', padding:'11px 12px 11px 36px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:11, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
                       onFocus={e => e.target.style.borderColor='rgba(139,92,246,0.6)'}
                       onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.09)'}/>
                   </div>
                 </div>
-              ))}
+                <div>
+                  <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>Last Name</label>
+                  <div style={{ position:'relative' }}>
+                    <User size={15} color="rgba(255,255,255,0.25)" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}/>
+                    <input 
+                      placeholder="Sharma" 
+                      required 
+                      value={lastName}
+                      onChange={e => setLastName(e.target.value)}
+                      style={{ width:'100%', padding:'11px 12px 11px 36px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:11, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                      onFocus={e => e.target.style.borderColor='rgba(139,92,246,0.6)'}
+                      onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.09)'}/>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>Work Email</label>
+                <div style={{ position:'relative' }}>
+                  <Mail size={15} color="rgba(255,255,255,0.25)" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}/>
+                  <input 
+                    type="email" 
+                    placeholder="admin@school.com" 
+                    required 
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    style={{ width:'100%', padding:'11px 12px 11px 38px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:11, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                    onFocus={e => e.target.style.borderColor='rgba(139,92,246,0.6)'}
+                    onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.09)'}/>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>Phone Number</label>
+                <div style={{ position:'relative' }}>
+                  <Phone size={15} color="rgba(255,255,255,0.25)" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}/>
+                  <input 
+                    type="tel" 
+                    placeholder="+91 60028 79151" 
+                    required 
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    style={{ width:'100%', padding:'11px 12px 11px 38px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:11, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                    onFocus={e => e.target.style.borderColor='rgba(139,92,246,0.6)'}
+                    onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.09)'}/>
+                </div>
+              </div>
+
               <div>
                 <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>Password</label>
                 <div style={{ position:'relative' }}>
                   <Lock size={15} color="rgba(255,255,255,0.25)" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}/>
-                  <input type={showPass ? 'text' : 'password'} placeholder="Min. 8 characters" required style={{ width:'100%', padding:'11px 40px 11px 38px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:11, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                  <input 
+                    type={showPass ? 'text' : 'password'} 
+                    placeholder="Min. 8 characters" 
+                    required 
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    minLength={8}
+                    style={{ width:'100%', padding:'11px 40px 11px 38px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:11, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
                     onFocus={e => e.target.style.borderColor='rgba(139,92,246,0.6)'}
                     onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.09)'}/>
                   <button type="button" onClick={() => setShowPass(!showPass)} style={{ position:'absolute', right:11, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)', display:'flex', alignItems:'center' }}>
@@ -153,6 +327,14 @@ export default function Signup() {
                   </button>
                 </div>
               </div>
+
+              {error && (
+                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px', background:'rgba(220,38,38,0.1)', border:'1px solid rgba(220,38,38,0.3)', borderRadius:10 }}>
+                  <AlertCircle size={15} color="#f87171" />
+                  <span style={{ fontSize:13, color:'#f87171', lineHeight:1.4 }}>{error}</span>
+                </div>
+              )}
+
               <motion.button type="submit" whileHover={{ scale:1.02 }} whileTap={{ scale:0.98 }}
                 style={{ width:'100%', padding:'13px', background:'linear-gradient(135deg,#4F8EF7,#8B5CF6)', border:'none', borderRadius:12, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginTop:4, boxShadow:'0 0 30px rgba(139,92,246,0.35)' }}>
                 Continue <ArrowRight size={17}/>
@@ -165,34 +347,46 @@ export default function Signup() {
               </p>
             </form>
           ) : (
-            <form onSubmit={e => { e.preventDefault(); navigate('/'); }} style={{ display:'flex', flexDirection:'column', gap:16 }}>
-              {[
-                { icon:Building, label:'School Name', ph:'Delhi Public School' },
-              ].map(({ icon:Icon, label, ph }) => (
-                <div key={label}>
-                  <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>{label}</label>
-                  <div style={{ position:'relative' }}>
-                    <Icon size={15} color="rgba(255,255,255,0.25)" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}/>
-                    <input placeholder={ph} required style={{ width:'100%', padding:'11px 12px 11px 38px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:11, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
-                      onFocus={e => e.target.style.borderColor='rgba(139,92,246,0.6)'}
-                      onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.09)'}/>
-                  </div>
+            <form onSubmit={handleSignup} style={{ display:'flex', flexDirection:'column', gap:16 }}>
+              <div>
+                <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>School Name</label>
+                <div style={{ position:'relative' }}>
+                  <Building size={15} color="rgba(255,255,255,0.25)" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}/>
+                  <input 
+                    placeholder="Delhi Public School" 
+                    required 
+                    value={schoolName}
+                    onChange={e => setSchoolName(e.target.value)}
+                    style={{ width:'100%', padding:'11px 12px 11px 38px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:11, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                    onFocus={e => e.target.style.borderColor='rgba(139,92,246,0.6)'}
+                    onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.09)'}/>
                 </div>
-              ))}
+              </div>
+
               {/* School Address */}
               <div>
                 <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>School Address</label>
                 <div style={{ position:'relative' }}>
                   <MapPin size={15} color="rgba(255,255,255,0.25)" style={{ position:'absolute', left:12, top:13 }}/>
-                  <textarea placeholder="123, MG Road, Bengaluru – 560001" required rows={3}
+                  <textarea 
+                    placeholder="123, MG Road, Bengaluru – 560001" 
+                    required 
+                    rows={3}
+                    value={schoolAddress}
+                    onChange={e => setSchoolAddress(e.target.value)}
                     style={{ width:'100%', padding:'11px 12px 11px 38px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:11, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box', resize:'none' }}
                     onFocus={e => (e.target.style.borderColor='rgba(139,92,246,0.6)')}
                     onBlur={e => (e.target.style.borderColor='rgba(255,255,255,0.09)')}/>
                 </div>
               </div>
+
               <div>
                 <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>Number of Students</label>
-                <select required style={{ width:'100%', padding:'11px 14px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:11, color:'rgba(255,255,255,0.7)', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                <select 
+                  required 
+                  value={studentRange}
+                  onChange={e => setStudentRange(e.target.value)}
+                  style={{ width:'100%', padding:'11px 14px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:11, color:'rgba(255,255,255,0.7)', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
                   onFocus={e => e.target.style.borderColor='rgba(139,92,246,0.6)'}
                   onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.09)'}>
                   <option value="" style={{ background:'#111' }}>Select range</option>
@@ -201,13 +395,35 @@ export default function Signup() {
                   ))}
                 </select>
               </div>
+
+              {/* Error display */}
+              {error && (
+                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px', background:'rgba(220,38,38,0.1)', border:'1px solid rgba(220,38,38,0.3)', borderRadius:10 }}>
+                  <AlertCircle size={15} color="#f87171" />
+                  <span style={{ fontSize:13, color:'#f87171', lineHeight:1.4 }}>{error}</span>
+                </div>
+              )}
+
               <div style={{ display:'flex', gap:12, marginTop:4 }}>
-                <button type="button" onClick={() => setStep(1)} style={{ flex:1, padding:'13px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:12, color:'rgba(255,255,255,0.6)', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                <button 
+                  type="button" 
+                  disabled={submitting}
+                  onClick={() => setStep(1)} 
+                  style={{ flex:1, padding:'13px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:12, color:'rgba(255,255,255,0.6)', fontSize:14, fontWeight:600, cursor: submitting ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
                   Back
                 </button>
-                <motion.button type="submit" whileHover={{ scale:1.02 }} whileTap={{ scale:0.98 }}
-                  style={{ flex:2, padding:'13px', background:'linear-gradient(135deg,#4F8EF7,#8B5CF6)', border:'none', borderRadius:12, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 0 30px rgba(139,92,246,0.35)' }}>
-                  🎉 Start Free Trial
+                <motion.button 
+                  type="submit" 
+                  disabled={submitting}
+                  whileHover={{ scale: submitting ? 1 : 1.02 }} 
+                  whileTap={{ scale: submitting ? 1 : 0.98 }}
+                  style={{ flex:2, padding:'13px', background:'linear-gradient(135deg,#4F8EF7,#8B5CF6)', border:'none', borderRadius:12, color:'#fff', fontSize:15, fontWeight:700, cursor: submitting ? 'not-allowed' : 'pointer', fontFamily:'inherit', boxShadow:'0 0 30px rgba(139,92,246,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  {submitting ? (
+                    <>
+                      <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                      Registering...
+                    </>
+                  ) : '🎉 Start Free Trial'}
                 </motion.button>
               </div>
             </form>

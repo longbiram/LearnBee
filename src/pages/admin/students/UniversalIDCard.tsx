@@ -1,8 +1,8 @@
 import React from 'react';
 import type { ErpStudent } from '../../../hooks/useErpStudents';
-import { QRCode } from 'react-qr-code';
+import _QRCode from "react-qr-code";
+const QRCode = (_QRCode as any).default || _QRCode;
 import { 
-  User, 
   GraduationCap, 
   BookOpen, 
   CheckCircle2, 

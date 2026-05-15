@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import AdminLayout from '../../components/AdminLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { useErpStaff, useSchoolInfo, updateStaff } from '../../hooks/useErpAcademics';
 import {
   Banknote, Search, Calendar, CheckCircle2,
-  FileText, Clock, TrendingUp, Download, Printer, X
+  FileText, Clock, TrendingUp, Printer, X
 } from 'lucide-react';
 
 /* ── helper functions ────────── */

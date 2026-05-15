@@ -1,9 +1,9 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Building2, CreditCard, ShoppingBag, Settings, LogOut,
-  Search, ChevronDown, ChevronRight, Menu, X, User, Mail, Shield, Plus, Package, Upload
+  Search, ChevronDown, ChevronRight, Menu, X, User, Shield, Package
 } from 'lucide-react';
 
 interface NavItem {

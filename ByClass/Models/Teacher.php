@@ -1,0 +1,2 @@
+<?php
+// Teacher.php placeholder

@@ -9,9 +9,8 @@ import {
 import { useStudents } from '../../hooks/useErpStudents';
 import { supabase } from '../../lib/supabase';
 import {
-  Package, Plus, Search, Edit2, Trash2, ShoppingCart, FileText,
-  BookOpen, ChevronDown, X, Check, AlertTriangle, Printer, RefreshCw,
-  BarChart2, TrendingUp, Archive, DollarSign
+  Plus, Search, Edit2, Trash2, ShoppingCart, FileText,
+  X, Check, AlertTriangle, Printer, RefreshCw, Archive
 } from 'lucide-react';
 
 /* ── types ─────────────────────────────────────────────────────── */
@@ -101,8 +100,6 @@ export default function Inventory({ noLayout = false }: { noLayout?: boolean }) 
   const [lastAutoFilledStudent, setLastAutoFilledStudent] = useState('');
   const [salePayment, setSalePayment] = useState('Cash');
   const [saleNotes, setSaleNotes] = useState('');
-  const [addingItem, setAddingItem] = useState('');
-  const [addingQty, setAddingQty] = useState(1);
   const [saleProcessing, setSaleProcessing] = useState(false);
 
   /* invoice modal */
@@ -163,7 +160,6 @@ export default function Inventory({ noLayout = false }: { noLayout?: boolean }) 
 
   /* ── Stats ── */
   const totalRevenue = sales.reduce((a, s) => a + (s.total_amount || 0), 0);
-  const totalStock = items.reduce((a, i) => a + i.stock_qty, 0);
   const totalSold = items.reduce((a, i) => a + i.sold_qty, 0);
   const lowStock = items.filter(i => (i.stock_qty - i.sold_qty) <= 5 && (i.stock_qty - i.sold_qty) >= 0).length;
 
@@ -229,15 +225,13 @@ export default function Inventory({ noLayout = false }: { noLayout?: boolean }) 
 
   /* ── Sale ── */
   function openSaleModal() {
-    setSaleStudent(''); setSaleStudentSearch(''); setSaleClassFilter(''); setLastAutoFilledStudent(''); setSaleItems([]); setSalePayment('Cash'); setSaleNotes(''); setAddingItem(''); setAddingQty(1);
+    setSaleStudent(''); setSaleStudentSearch(''); setSaleClassFilter(''); setLastAutoFilledStudent(''); setSaleItems([]); setSalePayment('Cash'); setSaleNotes('');
     setShowSaleModal(true);
   }
 
   // Auto-populate cart with student's class items + general items
   useEffect(() => {
     if (saleStudent && saleStudent !== lastAutoFilledStudent) {
-      const student = students.find((s: any) => s.id === saleStudent);
-      const sClass = student?.current_class_id;
       const defaults = items
         .filter(i => (i.stock_qty - i.sold_qty) > 0)
         .map(i => ({ item_id: i.id, name: i.name, qty: 1, unit_price: i.unit_price, total: i.unit_price }));
@@ -248,19 +242,7 @@ export default function Inventory({ noLayout = false }: { noLayout?: boolean }) 
       setLastAutoFilledStudent('');
     }
   }, [saleStudent, lastAutoFilledStudent, students, items]);
-  function handleAddSaleItem() {
-    const item = items.find(i => i.id === addingItem);
-    if (!item) return;
-    const avail = item.stock_qty - item.sold_qty;
-    if (addingQty > avail) { alert(`Only ${avail} in stock`); return; }
-    const existing = saleItems.find(s => s.item_id === item.id);
-    if (existing) {
-      setSaleItems(prev => prev.map(s => s.item_id === item.id ? { ...s, qty: s.qty + addingQty, total: (s.qty + addingQty) * s.unit_price } : s));
-    } else {
-      setSaleItems(prev => [...prev, { item_id: item.id, name: item.name, qty: addingQty, unit_price: item.unit_price, total: addingQty * item.unit_price }]);
-    }
-    setAddingItem(''); setAddingQty(1);
-  }
+
   const saleTotal = saleItems.reduce((a, i) => a + i.total, 0);
   async function handleCreateSale() {
     if (!schoolId || !sessionId || !saleStudent || saleItems.length === 0) return;
@@ -282,7 +264,7 @@ export default function Inventory({ noLayout = false }: { noLayout?: boolean }) 
     }
   }
 
-  const currentSession = sessions.find(s => s.id === sessionId);
+
 
   /* ─────────────────── RENDER ─────────────────────────── */
   const content = (

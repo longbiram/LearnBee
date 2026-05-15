@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../../../components/AdminLayout';
-import { Save, X, Loader2, CheckCircle, AlertCircle, User, UserCheck, KeyRound, GraduationCap } from 'lucide-react';
+import { Save, X, Loader2, AlertCircle, User, UserCheck, KeyRound, GraduationCap } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCreateStudent } from '../../../hooks/useErpStudents';
 import { useErpClasses } from '../../../hooks/useErpClasses';

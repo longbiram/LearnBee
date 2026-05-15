@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import SuperAdminLayout from '../../components/layout/SuperAdminLayout';
 import { supabase } from '../../lib/supabase';
-import { Search, Plus, Eye, Edit, Trash2, Shield, MoreVertical } from 'lucide-react';
+import { Search, Plus, Edit, Shield, MoreVertical } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function SchoolsList() {

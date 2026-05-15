@@ -1,0 +1,2 @@
+<?php
+// AuthUser.php placeholder

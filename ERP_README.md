@@ -36,13 +36,12 @@ npm install react-qr-code@^2.0.18 react-barcode@^1.6.1
 
 ## 2. Environment Variables & Credentials
 
-Create a local `.env` file in the root of your project and populate it from `.env.example`. **Never commit real credentials to Git.**
+Create a `.env` file in the root of your new project and populate it. **These are required for database access, authentication, and edge functions.**
 
 ```env
 # Supabase Client Configuration (Frontend Auth & Edge Function Caller)
 VITE_SUPABASE_URL=your-supabase-project-url
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-VITE_RAZORPAY_KEY_ID=your_razorpay_publishable_key
 
 # Supabase Backend/Admin Access (For Edge Functions/CLI Usage - DO NOT expose in frontend)
 SUPABASE_ACCESS_TOKEN=your-supabase-access-token
@@ -60,10 +59,6 @@ VITE_GOOGLE_TTS_API_KEY=your-google-tts-api-key
 
 # RevenueCat Integration (Payments)
 VITE_REVENUECAT_PUBLIC_KEY=your-revenuecat-public-key
-# Optional server-only integrations
-RAZORPAY_KEY_ID=your_razorpay_key_id
-RAZORPAY_KEY_SECRET=your_razorpay_key_secret
-RESEND_API_KEY=your_resend_api_key
 ```
 
 ---
@@ -152,6 +147,6 @@ src/
 1. Create the Vite project and install dependencies.
 2. Initialize Tailwind CSS (`@tailwindcss/vite` plugin configuration inside `vite.config.js`).
 3. Set up React Router in `App.jsx` with a Public Route (`<LandingPage />`) and Protected Routes (`<ERPLayout />`).
-4. Copy `.env.example` to `.env` and fill in your own credentials locally.
+4. Copy over the `.env` attributes shown above.
 5. Migrate the `src/pages/ERP` directory and the `src/layouts/DashboardLayout.jsx` from the old repo into the new app.
 6. Verify auth flow via Supabase Login, triggering a redirect to `/dashboard/erp`.

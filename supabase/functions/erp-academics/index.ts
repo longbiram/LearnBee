@@ -66,6 +66,7 @@ serve(async (req) => {
             case 'assignClassTeacher': return await assignClassTeacher(supabaseAdmin, user, payload);
             case 'removeClassTeacher': return await removeClassTeacher(supabaseAdmin, user, payload);
             case 'getRoutine': return await getRoutine(supabaseAdmin, user, payload);
+            case 'saveRoutine': return await saveRoutine(supabaseAdmin, user, payload);
             case 'getTeacherRoutine': return await getTeacherRoutine(supabaseAdmin, user, payload);
             case 'getNotices': return await getNotices(supabaseAdmin, user, payload);
             case 'createNotice': return await createNotice(supabaseAdmin, user, payload);
@@ -866,4 +867,29 @@ async function getStudents(supabaseAdmin: any, user: any, payload: any) {
     const { data, error } = await query.order('roll_number', { ascending: true });
     if (error) throw error;
     return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+
+async function saveRoutine(supabaseAdmin: any, user: any, payload: any) {
+    const { school_id, session_id, class_id, section, timetable_data, periods_data } = payload;
+    if (!school_id || !session_id || !class_id) throw new Error('Missing required fields');
+
+    const upsertData: any = {
+        school_id,
+        session_id,
+        class_id,
+        section: section || null,
+        timetable_data: timetable_data || {},
+        periods_data: periods_data || [],
+        created_by: user.id,
+        updated_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabaseAdmin
+        .from('erp_routines')
+        .upsert(upsertData, { onConflict: 'school_id,session_id,class_id,section' })
+        .select()
+        .single();
+
+    if (error) throw error;
+    return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }

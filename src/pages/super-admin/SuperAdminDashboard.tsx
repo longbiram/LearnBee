@@ -12,7 +12,15 @@ export default function SuperAdminDashboard() {
     totalSchools: 0,
     activeSchools: 0,
     totalStudents: 0,
-    mrr: 0
+    mrr: 0,
+    activeUsers: 0,
+    totalUsers: 0,
+    roleBreakdown: {
+      admins: 0,
+      teachers: 0,
+      students: 0,
+      staff: 0
+    }
   });
   const [recentSchools, setRecentSchools] = useState<any[]>([]);
   const [recentPayments, setRecentPayments] = useState<any[]>([]);
@@ -42,7 +50,7 @@ export default function SuperAdminDashboard() {
         .from('support_tickets')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       setAllTickets(data || []);
     } catch (err) {
@@ -56,7 +64,7 @@ export default function SuperAdminDashboard() {
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       const res = await fetch(`${SUPABASE_URL}/functions/v1/saas-platform/dashboard`, {
         method: 'GET',
         headers: {
@@ -73,7 +81,10 @@ export default function SuperAdminDashboard() {
           totalSchools: data.totalSchools || 0,
           activeSchools: data.activeSchools || 0,
           totalStudents: data.totalStudents || 0,
-          mrr: data.mrr || 0
+          mrr: data.mrr || 0,
+          activeUsers: data.activeUsers || 0,
+          totalUsers: data.totalUsers || 0,
+          roleBreakdown: data.roleBreakdown || { admins: 0, teachers: 0, students: 0, staff: 0 }
         });
         setRecentSchools(data.recentSchools || []);
         setRecentPayments(data.recentPayments || []);
@@ -96,7 +107,7 @@ export default function SuperAdminDashboard() {
   const handleResolveTicket = async (ticketId: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       const res = await fetch(`${SUPABASE_URL}/functions/v1/saas-platform/resolve-ticket`, {
         method: 'POST',
         headers: {
@@ -117,7 +128,7 @@ export default function SuperAdminDashboard() {
       setAllTickets(prev =>
         prev.map(t => t.id === ticketId ? { ...t, status: 'resolved' } : t)
       );
-      
+
       if (selectedTicket && selectedTicket.id === ticketId) {
         setSelectedTicket({ ...selectedTicket, status: 'resolved' });
       }
@@ -158,7 +169,7 @@ export default function SuperAdminDashboard() {
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>Recently Onboarded Schools</h3>
             <Link to="/super-admin/schools" style={{ fontSize: 13, color: '#818cf8', textDecoration: 'none', fontWeight: 600 }}>View All →</Link>
           </div>
-          
+
           {loading ? (
             <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Loading data...</div>
           ) : recentSchools.length === 0 ? (
@@ -185,50 +196,90 @@ export default function SuperAdminDashboard() {
           )}
         </div>
 
-        {/* System Health */}
-        <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 16, padding: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>System Health</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: resendStats.isConfigured ? '#10b981' : '#ef4444' }} />
-              <span style={{ color: '#94a3b8', fontWeight: 500 }}>Resend: {resendStats.isConfigured ? 'Connected' : 'Offline'}</span>
+        {/* Right Column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* System Health */}
+          <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 16, padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>System Health</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: resendStats.isConfigured ? '#10b981' : '#ef4444' }} />
+                <span style={{ color: '#94a3b8', fontWeight: 500 }}>Resend: {resendStats.isConfigured ? 'Connected' : 'Offline'}</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {[
+                { label: 'Database Storage', value: '1.2 GB / 8 GB', pct: 15, color: '#34d399' },
+                { label: 'API Requests (24h)', value: '124,500', pct: 60, color: '#fbbf24' },
+                {
+                  label: 'Resend Daily Quota (24h)',
+                  value: `${resendStats.sent24h} / ${resendStats.dailyLimit} emails`,
+                  pct: Math.min(100, Math.round((resendStats.sent24h / resendStats.dailyLimit) * 100)) || 0,
+                  color: '#818cf8'
+                },
+                {
+                  label: 'Resend Monthly Quota',
+                  value: `${resendStats.totalSent} / ${resendStats.monthlyLimit} emails`,
+                  pct: Math.min(100, Math.round((resendStats.totalSent / resendStats.monthlyLimit) * 100)) || 0,
+                  color: '#f472b6'
+                },
+              ].map((stat, i) => (
+                <div key={i}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ fontSize: 13, color: '#cbd5e1', fontWeight: 500 }}>{stat.label}</span>
+                    <span style={{ fontSize: 12, color: '#94a3b8' }}>{stat.value}</span>
+                  </div>
+                  <div style={{ height: 6, background: 'rgba(51,65,85,0.5)', borderRadius: 10, overflow: 'hidden' }}>
+                    <div style={{ width: `${stat.pct}%`, height: '100%', background: stat.color, borderRadius: 10 }} />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {[
-              { label: 'Database Storage', value: '1.2 GB / 8 GB', pct: 15, color: '#34d399' },
-              { label: 'API Requests (24h)', value: '124,500', pct: 60, color: '#fbbf24' },
-              { 
-                label: 'Resend Daily Quota (24h)', 
-                value: `${resendStats.sent24h} / ${resendStats.dailyLimit} emails`, 
-                pct: Math.min(100, Math.round((resendStats.sent24h / resendStats.dailyLimit) * 100)) || 0, 
-                color: '#818cf8' 
-              },
-              { 
-                label: 'Resend Monthly Quota', 
-                value: `${resendStats.totalSent} / ${resendStats.monthlyLimit} emails`, 
-                pct: Math.min(100, Math.round((resendStats.totalSent / resendStats.monthlyLimit) * 100)) || 0, 
-                color: '#f472b6' 
-              },
-            ].map((stat, i) => (
-              <div key={i}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, color: '#cbd5e1', fontWeight: 500 }}>{stat.label}</span>
-                  <span style={{ fontSize: 12, color: '#94a3b8' }}>{stat.value}</span>
+
+          {/* Platform Active Users */}
+          <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 16, padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Users size={18} color="#818cf8" /> Platform Active Users
+              </h3>
+              <span style={{ fontSize: 12, color: '#34d399', background: 'rgba(52,211,153,0.1)', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>
+                {stats.activeUsers} / {stats.totalUsers} Active
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {[
+                { label: 'Administrators', value: stats.roleBreakdown.admins, pct: stats.totalUsers ? Math.round((stats.roleBreakdown.admins / stats.totalUsers) * 100) : 0, color: '#818cf8', desc: 'Platform, school admin & staff admins' },
+                { label: 'Teachers', value: stats.roleBreakdown.teachers, pct: stats.totalUsers ? Math.round((stats.roleBreakdown.teachers / stats.totalUsers) * 100) : 0, color: '#34d399', desc: 'Active school educators' },
+                { label: 'Students', value: stats.roleBreakdown.students, pct: stats.totalUsers ? Math.round((stats.roleBreakdown.students / stats.totalUsers) * 100) : 0, color: '#f472b6', desc: 'Enrolled students accessing portal' },
+                { label: 'Staff Members', value: stats.roleBreakdown.staff, pct: stats.totalUsers ? Math.round((stats.roleBreakdown.staff / stats.totalUsers) * 100) : 0, color: '#fbbf24', desc: 'Accountants, clerks & librarians' },
+              ].map((role, i) => (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <div>
+                      <span style={{ fontSize: 13, color: '#cbd5e1', fontWeight: 600 }}>{role.label}</span>
+                      <span style={{ display: 'block', fontSize: 11, color: '#64748b' }}>{role.desc}</span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>{role.value}</span>
+                      <span style={{ fontSize: 11, color: '#64748b', marginLeft: 4 }}>({role.pct}%)</span>
+                    </div>
+                  </div>
+                  <div style={{ height: 6, background: 'rgba(51,65,85,0.5)', borderRadius: 10, overflow: 'hidden', marginTop: 4 }}>
+                    <div style={{ width: `${role.pct}%`, height: '100%', background: role.color, borderRadius: 10, transition: 'width 0.5s ease-out' }} />
+                  </div>
                 </div>
-                <div style={{ height: 6, background: 'rgba(51,65,85,0.5)', borderRadius: 10, overflow: 'hidden' }}>
-                  <div style={{ width: `${stat.pct}%`, height: '100%', background: stat.color, borderRadius: 10 }} />
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Customer Support Desk */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 24, marginTop: 24 }}>
-        
+
         {/* Recent Subscriptions & Transactions */}
         <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 16, padding: '24px', overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -275,16 +326,16 @@ export default function SuperAdminDashboard() {
         <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 16, padding: '24px', overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Ticket size={18} color="#818cf8"/> Customer Support Inbox
+              <Ticket size={18} color="#818cf8" /> Customer Support Inbox
             </h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 12, color: '#94a3b8', background: 'rgba(148,163,184,0.1)', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>
                 {recentTickets.filter(t => t.status === 'open').length} Active
               </span>
-              <button 
+              <button
                 onClick={handleViewAllTickets}
                 style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}>
-                View All <ExternalLink size={12}/>
+                View All <ExternalLink size={12} />
               </button>
             </div>
           </div>
@@ -313,7 +364,7 @@ export default function SuperAdminDashboard() {
                         {ticket.status}
                       </span>
                       <button onClick={() => setSelectedTicket(ticket)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '3px 6px', color: '#cbd5e1', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        View <ExternalLink size={10}/>
+                        View <ExternalLink size={10} />
                       </button>
                     </div>
                   </div>
@@ -328,12 +379,12 @@ export default function SuperAdminDashboard() {
       {selectedTicket && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(3,7,18,0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24 }}>
           <div style={{ width: '100%', maxWidth: 520, background: '#1e293b', border: '1px solid #334155', borderRadius: 20, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', overflow: 'hidden', animation: 'scaleUp 0.2s ease-out' }}>
-            
+
             {/* Modal Header */}
             <div style={{ background: 'linear-gradient(135deg,#0f172a,#1e293b)', padding: '20px 24px', borderBottom: '1px solid rgba(148,163,184,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(129,140,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ticket size={18} color="#818cf8"/>
+                  <Ticket size={18} color="#818cf8" />
                 </div>
                 <div>
                   <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#f8fafc' }}>Ticket LBT-{10000 + selectedTicket.ticket_number}</h4>
@@ -341,7 +392,7 @@ export default function SuperAdminDashboard() {
                 </div>
               </div>
               <button onClick={() => setSelectedTicket(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
-                <X size={18}/>
+                <X size={18} />
               </button>
             </div>
 
@@ -375,11 +426,11 @@ export default function SuperAdminDashboard() {
             <div style={{ padding: '16px 24px', background: 'rgba(15,23,42,0.5)', borderTop: '1px solid rgba(148,163,184,0.1)', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
               {selectedTicket.status !== 'resolved' ? (
                 <button onClick={() => handleResolveTicket(selectedTicket.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: 10, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                  <CheckCircle size={15}/> Mark as Resolved
+                  <CheckCircle size={15} /> Mark as Resolved
                 </button>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#10b981', fontSize: 13, fontWeight: 600 }}>
-                  <CheckCircle size={16}/> This ticket is resolved
+                  <CheckCircle size={16} /> This ticket is resolved
                 </div>
               )}
             </div>
@@ -392,12 +443,12 @@ export default function SuperAdminDashboard() {
       {showAllTicketsModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(3,7,18,0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 90, padding: 24 }}>
           <div style={{ width: '100%', maxWidth: 720, background: '#1e293b', border: '1px solid #334155', borderRadius: 20, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '85vh', animation: 'scaleUp 0.2s ease-out' }}>
-            
+
             {/* Modal Header */}
             <div style={{ background: 'linear-gradient(135deg,#0f172a,#1e293b)', padding: '20px 24px', borderBottom: '1px solid rgba(148,163,184,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(129,140,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ticket size={18} color="#818cf8"/>
+                  <Ticket size={18} color="#818cf8" />
                 </div>
                 <div>
                   <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>All Customer Support Tickets</h4>
@@ -405,7 +456,7 @@ export default function SuperAdminDashboard() {
                 </div>
               </div>
               <button onClick={() => setShowAllTicketsModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
-                <X size={18}/>
+                <X size={18} />
               </button>
             </div>
 
@@ -413,18 +464,18 @@ export default function SuperAdminDashboard() {
             <div style={{ padding: '16px 24px', background: 'rgba(15,23,42,0.2)', borderBottom: '1px solid rgba(148,163,184,0.06)', display: 'flex', flexDirection: 'column', gap: 12, flexShrink: 0 }}>
               <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 {/* Search */}
-                <input 
-                  type="text" 
-                  placeholder="Search by ticket #, subject, email or name..." 
+                <input
+                  type="text"
+                  placeholder="Search by ticket #, subject, email or name..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   style={{ flex: 1, padding: '8px 14px', background: 'rgba(15,23,42,0.4)', border: '1px solid rgba(51,65,85,0.6)', borderRadius: 10, color: '#fff', fontSize: 13, outline: 'none' }}
                 />
-                
+
                 {/* Filter buttons */}
                 <div style={{ display: 'flex', background: 'rgba(15,23,42,0.4)', padding: 3, borderRadius: 10, border: '1px solid rgba(51,65,85,0.6)' }}>
                   {(['all', 'open', 'resolved'] as const).map(f => (
-                    <button 
+                    <button
                       key={f}
                       onClick={() => setTicketFilter(f)}
                       style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: ticketFilter === f ? '#818cf8' : 'none', color: ticketFilter === f ? '#fff' : '#94a3b8', fontSize: 12, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize', transition: 'all 0.15s ease' }}>
@@ -446,9 +497,9 @@ export default function SuperAdminDashboard() {
                   const matchStatus = ticketFilter === 'all' || t.status === ticketFilter;
                   const query = searchQuery.toLowerCase().trim();
                   if (!query) return matchStatus;
-                  
+
                   const ticketNumStr = `LBT-${10000 + t.ticket_number}`.toLowerCase();
-                  const matchQuery = 
+                  const matchQuery =
                     t.name.toLowerCase().includes(query) ||
                     t.email.toLowerCase().includes(query) ||
                     t.subject.toLowerCase().includes(query) ||
@@ -477,18 +528,18 @@ export default function SuperAdminDashboard() {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <button 
+                      <button
                         onClick={() => {
                           setSelectedTicket(t);
-                        }} 
+                        }}
                         style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 12px', color: '#cbd5e1', cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.1s ease' }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}>
-                        Open Details <ExternalLink size={12}/>
+                        Open Details <ExternalLink size={12} />
                       </button>
                       {t.status !== 'resolved' && (
-                        <button 
-                          onClick={() => handleResolveTicket(t.id)} 
+                        <button
+                          onClick={() => handleResolveTicket(t.id)}
                           style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: 8, padding: '6px 12px', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.1s ease' }}>
                           Resolve
                         </button>
@@ -501,8 +552,8 @@ export default function SuperAdminDashboard() {
 
             {/* Modal Footer */}
             <div style={{ padding: '16px 24px', background: 'rgba(15,23,42,0.5)', borderTop: '1px solid rgba(148,163,184,0.1)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
-              <button 
-                onClick={() => setShowAllTicketsModal(false)} 
+              <button
+                onClick={() => setShowAllTicketsModal(false)}
                 style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, color: '#f8fafc', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}>

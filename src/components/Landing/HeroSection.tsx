@@ -18,9 +18,32 @@ export default function HeroSection() {
   const { scrollY } = useScroll();
   const navigate = useNavigate();
 
+  const [frontend, setFrontend] = useState(() => {
+    try {
+      const stored = localStorage.getItem('learnbee_saas_platform_settings_frontend');
+      if (stored) return JSON.parse(stored);
+    } catch { /* empty */ }
+    return {
+      heroBadge: 'School ERP Platform — Now Available',
+      heroHeadline: 'All-in-One School ERP System',
+      heroSubtext: 'Manage students, staff, fees, and results effortlessly — with a cloud-first platform built for modern schools.'
+    };
+  });
+
   const yParallax = useTransform(scrollY, [0, 600], [0, -120]);
   const opacityOut = useTransform(scrollY, [0, 500], [1, 0]);
   const scaleText  = useTransform(scrollY, [0, 400], [1, 0.92]);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      try {
+        const stored = localStorage.getItem('learnbee_saas_platform_settings_frontend');
+        if (stored) setFrontend(JSON.parse(stored));
+      } catch { /* empty */ }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -127,7 +150,7 @@ export default function HeroSection() {
         >
           <span style={{ width:7, height:7, borderRadius:'50%', background:'#8B5CF6', boxShadow:'0 0 8px #8B5CF6', display:'inline-block' }} />
           <span style={{ fontSize: isMobile ? 11 : 13, fontWeight:600, color:'#A78BFA', letterSpacing:'0.5px' }}>
-            School ERP Platform — Now Available
+            {frontend.heroBadge}
           </span>
         </motion.div>
 
@@ -143,9 +166,7 @@ export default function HeroSection() {
             marginBottom: isMobile ? 16 : 22,
           }}
         >
-          All-in-One{' '}
-          <span className="gradient-text">School ERP</span>
-          <br />System
+          {frontend.heroHeadline}
         </motion.h1>
 
         {/* Subtext */}
@@ -160,7 +181,7 @@ export default function HeroSection() {
             maxWidth: 560, marginInline: 'auto',
           }}
         >
-          Manage students, staff, fees, and results effortlessly — with a cloud-first platform built for modern schools.
+          {frontend.heroSubtext}
         </motion.p>
 
         {/* CTA buttons */}

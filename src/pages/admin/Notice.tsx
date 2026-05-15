@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '../../components/AdminLayout';
-import { Plus, Trash2, Eye, Edit2 } from 'lucide-react';
+import { Plus, Trash2, Edit2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getNotices, createNotice, updateNotice, deleteNotice } from '../../hooks/useErpAcademics';
 

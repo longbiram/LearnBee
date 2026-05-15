@@ -15,7 +15,7 @@ const markInput: React.CSSProperties = { padding: '6px 8px', border: '1px solid 
 export default function TeacherResults() {
   const { schoolId, profile } = useAuth();
   
-  const { classes, currentSession } = useErpClasses(schoolId);
+  const { currentSession } = useErpClasses(schoolId);
   const { exams, loading: examsLoading } = useExams(schoolId, currentSession?.id);
   const publishedExams = exams.filter((e: any) => e.status === 'published' || e.status === 'locked');
 

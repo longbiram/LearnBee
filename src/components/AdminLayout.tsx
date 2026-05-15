@@ -53,12 +53,7 @@ const navItems: NavItem[] = [
   { icon: Settings,     label: 'Settings', to: '/school-admin/settings' },
 ];
 
-function getParentLabel(path: string): string | null {
-  for (const item of navItems) {
-    if (item.children?.some(c => c.to === path)) return item.label;
-  }
-  return null;
-}
+
 
 import { useAuth } from '../contexts/AuthContext';
 import { useSchoolInfo, getNotifications, markNotificationsRead } from '../hooks/useErpAcademics';

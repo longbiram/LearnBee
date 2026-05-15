@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  GraduationCap, LayoutDashboard, UserCheck,
+  LayoutDashboard, UserCheck,
   CalendarDays, Bell, LogOut,
   Search, ChevronDown, ChevronRight, Menu, X, BarChart2,
   User, Mail, Shield, Settings, ShoppingBag,

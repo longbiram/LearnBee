@@ -37,6 +37,35 @@ export default function Footer() {
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
 
+  const [frontend, setFrontend] = useState(() => {
+    try {
+      const stored = localStorage.getItem('learnbee_saas_platform_settings_frontend');
+      if (stored) return JSON.parse(stored);
+    } catch { /* empty */ }
+    return {
+      footerTagline: 'The modern school management platform trusted by 500+ institutions.',
+      footerEmail: 'support@learnbee.in',
+      footerPhone: '+91 60028 79151',
+      footerAddress: 'Karbi Anglong, Assam, India 782460',
+      footerCopyright: '© 2025 LearnBee ERP. All rights reserved.',
+      socialTwitter: 'https://twitter.com/learnbee',
+      socialLinkedin: 'https://linkedin.com/company/learnbee',
+      socialGithub: 'https://github.com/learnbee',
+      socialInstagram: 'https://instagram.com/learnbee'
+    };
+  });
+
+  useEffect(() => {
+    const handleStorage = () => {
+      try {
+        const stored = localStorage.getItem('learnbee_saas_platform_settings_frontend');
+        if (stored) setFrontend(JSON.parse(stored));
+      } catch { /* empty */ }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 640);
     window.addEventListener('resize', onResize);
@@ -54,6 +83,13 @@ export default function Footer() {
       navigate(path);
     }
   };
+
+  const dynamicSocials = [
+    { icon: Twitter,   href: frontend.socialTwitter,   label: 'Twitter'   },
+    { icon: Linkedin,  href: frontend.socialLinkedin,  label: 'LinkedIn'  },
+    { icon: Github,    href: frontend.socialGithub,    label: 'GitHub'    },
+    { icon: Instagram, href: frontend.socialInstagram, label: 'Instagram' },
+  ];
 
   return (
     <footer style={{
@@ -84,15 +120,15 @@ export default function Footer() {
               </span>
             </div>
             <p style={{ fontSize:13, color:'rgba(255,255,255,0.35)', lineHeight:1.7, marginBottom:20, maxWidth: isMobile ? '100%' : 200 }}>
-              The modern school management platform trusted by 500+ institutions.
+              {frontend.footerTagline}
             </p>
 
             {/* Contact */}
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { icon: Mail,   val: 'support@learnbee.in' },
-                { icon: Phone,  val: '+91 60028 79151'    },
-                { icon: MapPin, val: 'Karbi Anglong, Assam, India 782460' },
+                { icon: Mail,   val: frontend.footerEmail },
+                { icon: Phone,  val: frontend.footerPhone },
+                { icon: MapPin, val: frontend.footerAddress },
               ].map(({ icon: Icon, val }) => (
                 <div key={val} style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'rgba(255,255,255,0.35)' }}>
                   <Icon size={12} color="rgba(139,92,246,0.8)"/>
@@ -140,13 +176,13 @@ export default function Footer() {
           flexDirection: isMobile ? 'column' : 'row',
         }}>
           <span style={{ fontSize:12, color:'rgba(255,255,255,0.25)' }}>
-            © 2025 LearnBee ERP. All rights reserved.
+            {frontend.footerCopyright}
           </span>
 
           {/* Social icons */}
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            {socials.map(({ icon: Icon, href, label }) => (
-              <a key={label} href={href} aria-label={label}
+            {dynamicSocials.map(({ icon: Icon, href, label }) => (
+              <a key={label} href={href} aria-label={label} target="_blank" rel="noopener noreferrer"
                 style={{
                   width:34, height:34, borderRadius:9,
                   background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)',
