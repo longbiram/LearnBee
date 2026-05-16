@@ -26,12 +26,7 @@ const links: Record<string, { label: string; path: string }[]> = {
   ],
 };
 
-const socials = [
-  { icon: Twitter,   href: '#', label: 'Twitter'   },
-  { icon: Linkedin,  href: '#', label: 'LinkedIn'  },
-  { icon: Github,    href: '#', label: 'GitHub'    },
-  { icon: Instagram, href: '#', label: 'Instagram' },
-];
+
 
 export default function Footer() {
   const navigate = useNavigate();

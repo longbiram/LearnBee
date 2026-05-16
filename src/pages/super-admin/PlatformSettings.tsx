@@ -4,8 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Settings, Globe, Key, Shield, User, Save, RefreshCw, CheckCircle,
-  AlertTriangle, Eye, EyeOff, Loader2, Copy, ExternalLink, Sliders,
+  Globe, Key, Shield, User, Save, CheckCircle,
+  AlertTriangle, Eye, EyeOff, Loader2, Copy, Sliders,
   Mail, Lock, Database, Terminal, Server, Phone, Calendar, Check,
   MapPin, Share2, Layout
 } from 'lucide-react';
