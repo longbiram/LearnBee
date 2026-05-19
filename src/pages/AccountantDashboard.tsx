@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, LayoutDashboard, FileText, ChevronDown, TrendingUp, DollarSign, Receipt, Search, IndianRupee, Users, AlertCircle, Loader2, X, Package, ShoppingBag, RefreshCw } from 'lucide-react';
+import { LogOut, LayoutDashboard, FileText, ChevronDown, TrendingUp, DollarSign, Receipt, Search, IndianRupee, Users, AlertCircle, Loader2, X, Package, ShoppingBag, RefreshCw, Menu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import learnBeeLogo from '../assets/learnbeelogo.png';
@@ -26,6 +26,19 @@ export default function AccountantDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('dashboard');
   const [profileOpen, setProfileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024);
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (mobile) setSidebarOpen(false);
+      else setSidebarOpen(true);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   
   const { currentSession, classes: erpClasses } = useErpClasses(schoolId);
   const { school } = useSchoolInfo(schoolId);
@@ -250,8 +263,33 @@ export default function AccountantDashboard() {
   return (
     <ProtectedRoute allowedRoles={['accountant']}>
       <div style={{ minHeight: '100vh', display: 'flex', background: '#f1f5f9', fontFamily: 'Outfit, sans-serif' }}>
+        {/* Mobile overlay backdrop */}
+        {isMobile && (
+          <div
+            className={`sidebar-overlay ${sidebarOpen ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-        <div style={{ width: 240, background: '#0f172a', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <div
+          className={isMobile ? `dashboard-sidebar-mobile ${sidebarOpen ? 'open' : ''}` : ''}
+          style={{
+            width: isMobile ? 240 : (sidebarOpen ? 240 : 0),
+            minWidth: isMobile ? 240 : (sidebarOpen ? 240 : 0),
+            background: '#0f172a',
+            display: 'flex',
+            flexDirection: 'column',
+            flexShrink: 0,
+            height: '100vh',
+            position: isMobile ? 'fixed' : 'sticky',
+            top: 0,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            transition: isMobile ? 'transform 0.3s ease' : 'width .25s,min-width .25s',
+            zIndex: 100,
+          }}
+        >
           <div style={{ padding: '22px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ background: '#fff', width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
               <img src={learnBeeLogo} alt="LearnBee" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
@@ -263,7 +301,11 @@ export default function AccountantDashboard() {
             {navItems.map(item => {
               const active = tab === (item as any).tab;
               return (
-                <div key={item.label} onClick={() => (item as any).to ? navigate((item as any).to) : setTab((item as any).tab as Tab)}
+                <div key={item.label} onClick={() => {
+                  if ((item as any).to) navigate((item as any).to);
+                  else setTab((item as any).tab as Tab);
+                  if (isMobile) setSidebarOpen(false);
+                }}
                   style={{ padding: '11px 14px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 11, marginBottom: 2, background: active ? 'rgba(14,165,233,0.15)' : 'transparent', color: active ? '#38bdf8' : '#94a3b8', cursor: 'pointer', fontSize: 14, fontWeight: active ? 600 : 500, borderLeft: active ? `3px solid ${ACCENT}` : '3px solid transparent', transition: 'all 0.15s' }}
                   onMouseEnter={e => { if (!active) { e.currentTarget.style.color = '#e2e8f0'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; } }}
                   onMouseLeave={e => { if (!active) { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.background = 'transparent'; } }}
@@ -285,33 +327,38 @@ export default function AccountantDashboard() {
         </div>
 
         {/* Main */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <header style={{ height: 64, background: '#fff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', padding: '0 28px', gap: 16, flexShrink: 0 }}>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+          <header className="dashboard-header" style={{ height: 64, background: '#fff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', padding: isMobile ? '0 16px' : '0 28px', gap: 16, flexShrink: 0 }}>
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 6, borderRadius: 8 }}>
+              {sidebarOpen ? <X size={20} color="#475569" /> : <Menu size={20} color="#475569" />}
+            </button>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, overflow: 'hidden' }}>
               {school?.logo_url && (
-                <div style={{ width: 32, height: 32, borderRadius: 8, overflow: 'hidden', border: '1px solid #f1f5f9' }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, overflow: 'hidden', border: '1px solid #f1f5f9', flexShrink: 0 }}>
                   <img src={school.logo_url} alt={school.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 </div>
               )}
-              <span style={{ fontSize: 17, fontWeight: 700, color: '#1e293b' }}>
+              <span style={{ fontSize: 17, fontWeight: 700, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {school?.name || 'Accountant Dashboard'}
               </span>
             </div>
-            <div ref={profileRef} style={{ position: 'relative' }}>
+            <div ref={profileRef} style={{ position: 'relative', flexShrink: 0 }}>
               <button onClick={() => setProfileOpen(!profileOpen)}
                 style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 10px 6px 6px', borderRadius: 12, background: profileOpen ? '#f1f5f9' : 'transparent', border: `1px solid ${profileOpen ? '#e2e8f0' : 'transparent'}`, cursor: 'pointer' }}>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', background: `linear-gradient(135deg,${ACCENT},#6366f1)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>{initials}</div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{profile?.full_name}</div>
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Accountant</div>
-                </div>
+                {!isMobile && (
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{profile?.full_name}</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>Accountant</div>
+                  </div>
+                )}
                 <ChevronDown size={14} color="#94a3b8" />
               </button>
               <AnimatePresence>
                 {profileOpen && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
                     style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: 220, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.12)', zIndex: 200, overflow: 'hidden', padding: '8px 12px' }}>
-                    <div style={{ fontSize: 13, color: '#475569', padding: '6px 4px 10px', borderBottom: '1px solid #f1f5f9', marginBottom: 6 }}>{user?.email}</div>
+                    <div style={{ fontSize: 13, color: '#475569', padding: '6px 4px 10px', borderBottom: '1px solid #f1f5f9', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
                     <button onClick={async () => { await signOut(); navigate('/login', { replace: true }); }}
                       style={{ width: '100%', padding: '9px 12px', borderRadius: 8, background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 600, color: '#dc2626' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.05)'}
@@ -324,7 +371,7 @@ export default function AccountantDashboard() {
             </div>
           </header>
 
-          <main style={{ flex: 1, padding: '28px 32px', overflowY: 'auto' }}>
+          <main className="dashboard-main-content" style={{ flex: 1, padding: isMobile ? '16px' : '28px 32px', overflowY: 'auto', minWidth: 0 }}>
             {tab === 'dashboard' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20 }}>

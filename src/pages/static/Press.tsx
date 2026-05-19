@@ -1,15 +1,33 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Download, ExternalLink, Award } from 'lucide-react';
 import PageLayout from '../../components/PageLayout';
 
-const coverage = [
-  { outlet:'EdTech Review India', headline:'"LearnBee ERP is the missing piece for India\'s school digitisation story"', date:'Feb 2025', logo:'📰' },
-  { outlet:'The Hindu Education',  headline:'"From chaos to clarity: How a Bengaluru startup is transforming school admin"',        date:'Jan 2025', logo:'📰' },
-  { outlet:'YourStory',            headline:'"LearnBee ERP raises seed round to scale across 10 states"',                           date:'Dec 2024', logo:'📰' },
-  { outlet:'Inc42',                headline:'"5 EdTech startups redefining education infrastructure in India"',                       date:'Nov 2024', logo:'📰' },
-];
-
 export default function Press() {
+  const [coverage, setCoverage] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPress = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/public-saas/press`, {
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          }
+        });
+        const data = await res.json();
+        if (data.press) {
+          setCoverage(data.press);
+        }
+      } catch (err) {
+        console.error('Error fetching press coverage', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPress();
+  }, []);
+
   return (
     <PageLayout>
       <motion.div initial={{ opacity:0, y:30 }} animate={{ opacity:1, y:0 }} style={{ textAlign:'center', marginBottom:64 }}>
@@ -45,21 +63,28 @@ export default function Press() {
 
       {/* Coverage */}
       <h2 style={{ fontSize:24, fontWeight:800, color:'#fff', marginBottom:24 }}>Press Coverage</h2>
-      <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-        {coverage.map(({ outlet, headline, date, logo }, i) => (
-          <motion.div key={outlet} initial={{ opacity:0, x:-20 }} whileInView={{ opacity:1, x:0 }}
-            viewport={{ once:true }} transition={{ delay:i*0.1 }}
-            whileHover={{ x:4 }}
-            style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:16, padding:'20px 24px', cursor:'pointer', display:'flex', alignItems:'center', gap:16 }}>
-            <span style={{ fontSize:28 }}>{logo}</span>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:12, color:'rgba(255,255,255,0.35)', marginBottom:6 }}>{outlet} · {date}</div>
-              <div style={{ fontSize:15, fontWeight:600, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{headline}</div>
-            </div>
-            <ExternalLink size={16} color="rgba(255,255,255,0.3)"/>
-          </motion.div>
-        ))}
-      </div>
+      {loading ? (
+        <p style={{ color: '#cbd5e1' }}>Loading coverage...</p>
+      ) : coverage.length === 0 ? (
+        <p style={{ color: 'rgba(255,255,255,0.45)', textAlign: 'center', padding: 20 }}>No press coverage found.</p>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          {coverage.map(({ outlet, headline, date, logo, link }, i) => (
+            <motion.div key={outlet + i} initial={{ opacity:0, x:-20 }} whileInView={{ opacity:1, x:0 }}
+              viewport={{ once:true }} transition={{ delay:i*0.1 }}
+              whileHover={{ x:4 }}
+              onClick={() => link && window.open(link, '_blank')}
+              style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:16, padding:'20px 24px', cursor: link ? 'pointer' : 'default', display:'flex', alignItems:'center', gap:16 }}>
+              <span style={{ fontSize:28 }}>{logo || '📰'}</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, color:'rgba(255,255,255,0.35)', marginBottom:6 }}>{outlet} · {date}</div>
+                <div style={{ fontSize:15, fontWeight:600, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{headline}</div>
+              </div>
+              {link && <ExternalLink size={16} color="rgba(255,255,255,0.3)"/>}
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       <div style={{ marginTop:52, padding:'28px 32px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:20, textAlign:'center' }}>
         <Award size={28} color="#8B5CF6" style={{ marginBottom:12 }}/>

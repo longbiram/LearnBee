@@ -85,7 +85,8 @@ Deno.serve(async (req) => {
         resolvedTicketsResult,
         created24hResult,
         resolved24hResult,
-        profilesResult
+        profilesResult,
+        demoBookingsResult
       ] = await Promise.all([
         supabaseAdmin.from('schools').select('*').order('created_at', { ascending: false }),
         supabaseAdmin.from('erp_students').select('*', { count: 'exact', head: true }),
@@ -96,6 +97,7 @@ Deno.serve(async (req) => {
         supabaseAdmin.from('support_tickets').select('*', { count: 'exact', head: true }).gte('created_at', last24h),
         supabaseAdmin.from('support_tickets').select('*', { count: 'exact', head: true }).eq('status', 'resolved').gte('updated_at', last24h),
         supabaseAdmin.from('profiles').select('role, status'),
+        supabaseAdmin.from('demo_bookings').select('*').order('created_at', { ascending: false }).limit(10)
       ]);
 
       const schools = schoolsResult.data || [];
@@ -127,6 +129,7 @@ Deno.serve(async (req) => {
         recentSchools: schools.slice(0, 5),
         recentPayments: paymentsResult.data || [],
         recentTickets: ticketsResult.data || [],
+        recentDemoBookings: demoBookingsResult.data || [],
         resendStats: {
           isConfigured: !!resendKey,
           totalSent,
@@ -248,6 +251,105 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── book-demo ──────────────────────────────────────────────
+    if (pathname.includes('book-demo')) {
+      if (req.method === 'POST') {
+        const { firstName, lastName, workEmail, phoneNumber, schoolName, schoolSize, preferredDate, preferredTimeSlot } = await req.json();
+        
+        const { data, error } = await supabaseAdmin
+          .from('demo_bookings')
+          .insert([{
+            first_name: firstName,
+            last_name: lastName,
+            work_email: workEmail,
+            phone_number: phoneNumber,
+            school_name: schoolName,
+            school_size: schoolSize,
+            preferred_date: preferredDate,
+            preferred_time_slot: preferredTimeSlot,
+            status: 'pending'
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Send Email via Resend
+        const resendKey = Deno.env.get('RESEND_API_KEY');
+        let emailSent = false;
+        
+        if (resendKey) {
+          try {
+            const emailHtml = `
+              <div style="font-family: 'Outfit', 'Segoe UI', Tahoma, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                  <img src="https://ensxqeamigwifsoicdam.supabase.co/storage/v1/object/public/marketplace/learnbeelogo.png" alt="LearnBee Logo" style="width: 50px; height: 50px; object-fit: contain; border-radius: 12px; box-shadow: 0 4px 12px rgba(139,92,246,0.15);" />
+                </div>
+                <div style="background: linear-gradient(135deg, #4f8ef7, #8b5cf6); padding: 32px 24px; border-radius: 12px; text-align: center; color: #ffffff; margin-bottom: 24px;">
+                  <h2 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; color: #ffffff;">Demo Scheduled! 🎉</h2>
+                  <p style="margin: 8px 0 0; font-size: 15px; opacity: 0.9; color: #ffffff;">We are excited to show you LearnBee in action.</p>
+                </div>
+                
+                <div style="padding: 0 12px;">
+                  <p style="font-size: 15px; color: #334155; line-height: 1.6;">Hello <strong>${firstName}</strong>,</p>
+                  
+                  <p style="font-size: 15px; color: #334155; line-height: 1.6;">Thank you for your interest in LearnBee. Your demo has been scheduled for <strong>${preferredDate}</strong> at <strong>${preferredTimeSlot} (IST)</strong>.</p>
+                  
+                  <p style="font-size: 15px; color: #334155; line-height: 1.6;">One of our product specialists will reach out to you shortly to provide the meeting details.</p>
+                  
+                  <h4 style="font-size: 14px; color: #1e293b; margin: 24px 0 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Your Details</h4>
+                  <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px;">
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                      <td style="padding: 10px 0; color: #64748b; font-weight: 500; width: 120px;">School</td>
+                      <td style="padding: 10px 0; color: #1e293b; font-weight: 600;">${schoolName}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                      <td style="padding: 10px 0; color: #64748b; font-weight: 500; width: 120px;">Phone</td>
+                      <td style="padding: 10px 0; color: #1e293b; font-weight: 600;">${phoneNumber}</td>
+                    </tr>
+                  </table>
+                  
+                  <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+                  
+                  <p style="font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.5; margin: 0;">
+                    © 2026 LearnBee ERP. All rights reserved.
+                  </p>
+                </div>
+              </div>
+            `;
+
+            const mailRes = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${resendKey}`,
+              },
+              body: JSON.stringify({
+                from: 'LearnBee Team <onboarding@resend.dev>',
+                to: [workEmail],
+                subject: `LearnBee Demo Confirmation`,
+                html: emailHtml,
+              }),
+            });
+            
+            if (mailRes.ok) {
+              emailSent = true;
+              console.log(`[EMAIL] Demo confirmation email sent to ${workEmail}`);
+            } else {
+              const mailErr = await mailRes.text();
+              console.warn(`[EMAIL] Failed to send email via Resend: ${mailErr}`);
+            }
+          } catch (e: any) {
+            console.error(`[EMAIL] Error sending email: ${e.message}`);
+          }
+        }
+
+        return new Response(JSON.stringify({ success: true, emailSent, booking: data }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // ── resolve-ticket (Mark ticket as resolved and email notification) ──
     if (pathname.includes('resolve-ticket')) {
       if (req.method === 'POST') {
@@ -335,6 +437,109 @@ Deno.serve(async (req) => {
         }
         
         return new Response(JSON.stringify({ success: true, ticket, emailSent }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // ── complete-booking (Mark booking as completed and email notification) ──
+    if (pathname.includes('complete-booking')) {
+      if (req.method === 'POST') {
+        if (!isSuperAdmin) return new Response('Unauthorized', { status: 401, headers: corsHeaders });
+        
+        const { bookingId } = await req.json();
+        if (!bookingId) {
+          return new Response(JSON.stringify({ error: 'Missing bookingId' }), { status: 400, headers: corsHeaders });
+        }
+        
+        // Update DB
+        const { data: booking, error } = await supabaseAdmin
+          .from('demo_bookings')
+          .update({ status: 'completed' })
+          .eq('id', bookingId)
+          .select()
+          .single();
+          
+        if (error) throw error;
+        
+        // Send email
+        const resendKey = Deno.env.get('RESEND_API_KEY');
+        let emailSent = false;
+        
+        if (resendKey && booking) {
+          try {
+            const emailHtml = `
+              <div style="font-family: 'Outfit', 'Segoe UI', Tahoma, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                  <img src="https://ensxqeamigwifsoicdam.supabase.co/storage/v1/object/public/marketplace/learnbeelogo.png" alt="LearnBee Logo" style="width: 50px; height: 50px; object-fit: contain; border-radius: 12px; box-shadow: 0 4px 12px rgba(139,92,246,0.15);" />
+                </div>
+                <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 32px 24px; border-radius: 12px; text-align: center; color: #ffffff; margin-bottom: 24px;">
+                  <h2 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; color: #ffffff;">Booking Completed! 🚀</h2>
+                  <p style="margin: 8px 0 0; font-size: 15px; opacity: 0.9; color: #ffffff;">Thank you for exploring LearnBee.</p>
+                </div>
+                
+                <div style="padding: 0 12px;">
+                  <p style="font-size: 15px; color: #334155; line-height: 1.6;">Hello <strong>${booking.first_name}</strong>,</p>
+                  
+                  <p style="font-size: 15px; color: #334155; line-height: 1.6;">We are pleased to inform you that your schedule booking has been marked as <strong>Completed</strong>.</p>
+                  
+                  <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 18px 20px; margin: 24px 0;">
+                    <h4 style="margin: 0 0 8px; font-size: 14px; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Booking Details</h4>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                      <tr>
+                        <td style="padding: 6px 0; color: #64748b; font-weight: 500;">School</td>
+                        <td style="padding: 6px 0; color: #1e293b; font-weight: 600;">${booking.school_name}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; color: #64748b; font-weight: 500;">Date</td>
+                        <td style="padding: 6px 0; color: #1e293b; font-weight: 600;">${booking.preferred_date}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; color: #64748b; font-weight: 500;">Time Slot</td>
+                        <td style="padding: 6px 0; color: #1e293b; font-weight: 600;">${booking.preferred_time_slot}</td>
+                      </tr>
+                    </table>
+                  </div>
+                  
+                  <p style="font-size: 15px; color: #334155; line-height: 1.6;">We hope the demo was informative and helpful. If you have any further questions or would like to proceed with onboarding, please feel free to reach out to us.</p>
+                  
+                  <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+                  
+                  <p style="font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.5; margin: 0;">
+                    Thank you for choosing LearnBee ERP.<br />
+                    © 2026 LearnBee ERP. All rights reserved.
+                  </p>
+                </div>
+              </div>
+            `;
+            
+            const mailRes = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${resendKey}`,
+              },
+              body: JSON.stringify({
+                from: 'LearnBee Team <onboarding@resend.dev>',
+                to: [booking.work_email],
+                subject: `Schedule Booking Completed - LearnBee`,
+                html: emailHtml,
+              }),
+            });
+            
+            if (mailRes.ok) {
+              emailSent = true;
+              console.log(`[EMAIL] Completion email sent to ${booking.work_email}`);
+            } else {
+              const mailErr = await mailRes.text();
+              console.warn(`[EMAIL] Failed to send completion email via Resend: ${mailErr}`);
+            }
+          } catch (e: any) {
+            console.error(`[EMAIL] Error sending completion email: ${e.message}`);
+          }
+        }
+        
+        return new Response(JSON.stringify({ success: true, booking, emailSent }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }

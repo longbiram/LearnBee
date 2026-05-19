@@ -38,6 +38,7 @@ const navItems: NavItem[] = [
     icon: BookOpen, label: 'Teachers', children: [
       { label: 'All Teachers', to: '/school-admin/teachers' },
       { label: 'Add Teacher', to: '/school-admin/teachers/add' },
+      { label: 'Leave Requests', to: '/school-admin/teachers/leave-requests' },
       { label: 'Resigned', to: '/school-admin/teachers/resigned' },
       { label: 'Class Teachers',  to: '/school-admin/class-teachers' },
       { label: 'ID Cards', to: '/school-admin/teachers/id-cards' },
@@ -91,8 +92,20 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import { getAttendance } from '../hooks/useErpAttendance';
 
 export default function SchoolAdminDashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024);
   const [openNav, setOpenNav] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (!mobile) setSidebarOpen(true);
+      else setSidebarOpen(false);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Upgrade staff modals state
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -271,21 +284,23 @@ export default function SchoolAdminDashboard() {
 
   /* ── sidebar ──────────────────────────────────────── */
   const Sidebar = (
-    <aside style={{
-      width: sidebarOpen ? 240 : 0,
-      minWidth: sidebarOpen ? 240 : 0,
-      background: '#fff',
-      borderRight: '1px solid #e5e7eb',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100vh',
-      position: 'sticky',
-      top: 0,
-      overflowY: 'auto',
-      overflowX: 'hidden',
-      transition: 'width .25s,min-width .25s',
-      zIndex: 100,
-    }}>
+    <aside
+      className={isMobile ? `dashboard-sidebar-mobile ${sidebarOpen ? 'open' : ''}` : ''}
+      style={{
+        width: isMobile ? 240 : (sidebarOpen ? 240 : 0),
+        minWidth: isMobile ? 240 : (sidebarOpen ? 240 : 0),
+        background: '#fff',
+        borderRight: '1px solid #e5e7eb',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        position: isMobile ? 'fixed' : 'sticky',
+        top: 0,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        transition: isMobile ? 'transform 0.3s ease' : 'width .25s,min-width .25s',
+        zIndex: 100,
+      }}>
       {/* Logo */}
       <div style={{ padding: '20px 20px 14px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
@@ -332,6 +347,9 @@ export default function SchoolAdminDashboard() {
                               e.preventDefault();
                               setShowUpgradeModal(true);
                             }
+                            if (isMobile) {
+                              setSidebarOpen(false);
+                            }
                           }}
                           style={{ display: 'block', padding: '7px 10px', fontSize: 13, color: '#64748b', textDecoration: 'none', borderRadius: 7, marginBottom: 1 }}
                           onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
@@ -348,6 +366,11 @@ export default function SchoolAdminDashboard() {
           }
           return (
             <Link key={item.label} to={item.to!}
+              onClick={() => {
+                if (isMobile) {
+                  setSidebarOpen(false);
+                }
+              }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '9px 10px', borderRadius: 9, fontSize: 14,
@@ -381,30 +404,40 @@ export default function SchoolAdminDashboard() {
   return (
     <ProtectedRoute allowedRoles={['school_admin', 'admin']}>
       <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc', fontFamily: 'Outfit, system-ui, sans-serif' }}>
+        {/* Mobile overlay backdrop */}
+        {isMobile && (
+          <div
+            className={`sidebar-overlay ${sidebarOpen ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
         {Sidebar}
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
         {/* ── Top bar ────────────────────────────────── */}
-        <header style={{
+        <header className="dashboard-header" style={{
           background: '#fff', borderBottom: '1px solid #e5e7eb',
-          padding: '0 24px', height: 64, display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 90, gap: 16,
+          padding: '0 16px', height: 64, display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 90, gap: 8,
+          flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16, minWidth: 0, overflow: 'hidden' }}>
             <button onClick={() => setSidebarOpen(p => !p)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 6, borderRadius: 8 }}>
-              {sidebarOpen ? <X size={22} color="#475569" /> : <Menu size={22} color="#475569" />}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 6, borderRadius: 8, flexShrink: 0 }}>
+              <Menu size={22} color="#475569" />
             </button>
             {/* School branding */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg,#f0abfc,#818cf8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🏫</div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>
-                  {school?.name || 'Loading School...'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, overflow: 'hidden' }}>
+              <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,#f0abfc,#818cf8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>🏫</div>
+              {!isMobile && (
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>
+                    {school?.name || 'Loading School...'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Admin Dashboard</div>
                 </div>
-                <div style={{ fontSize: 11, color: '#94a3b8' }}>Admin Dashboard</div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -636,7 +669,7 @@ export default function SchoolAdminDashboard() {
         </header>
 
         {/* ── Content area ───────────────────────────── */}
-        <main style={{ flex: 1, padding: '28px 28px 40px', overflowY: 'auto' }}>
+        <main className="dashboard-main-content" style={{ flex: 1, padding: '28px 28px 40px', overflowY: 'auto', minWidth: 0 }}>
 
           {/* Welcome */}
           <div style={{ marginBottom: 24 }}>
@@ -675,7 +708,7 @@ export default function SchoolAdminDashboard() {
                 </div>
                 <button onClick={() => navigate('/school-admin/inventory')} style={{ fontSize: 12, color: '#7c3aed', background: '#ede9fe', border: 'none', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>Manage →</button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
                 {[
                   { label: 'Total Items', value: invStats.totalItems, icon: '📦', color: '#7c3aed', bg: '#ede9fe' },
                   { label: 'Total Revenue', value: `₹${Number(invStats.totalRevenue).toLocaleString('en-IN')}`, icon: '💰', color: '#16a34a', bg: '#dcfce7' },
@@ -693,7 +726,7 @@ export default function SchoolAdminDashboard() {
           )}
 
           {/* ── Middle row: Attendance + Fees + Notices ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px 260px', gap: 18, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px 260px', gap: 18, marginBottom: 24 }}>
 
             {/* Student Attendance */}
             <div style={{ background: '#fff', borderRadius: 16, padding: 22, border: '1px solid #e5e7eb', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>

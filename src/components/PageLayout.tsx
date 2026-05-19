@@ -60,7 +60,7 @@ export default function PageLayout({ children, maxWidth = 1100 }: PageLayoutProp
         textAlign:'center',
         fontSize:12, color:'rgba(255,255,255,0.2)',
       }}>
-        © 2025 LearnBee ERP. All rights reserved.
+        © {new Date().getFullYear()} LearnBee ERP. All rights reserved.
       </div>
     </div>
   );

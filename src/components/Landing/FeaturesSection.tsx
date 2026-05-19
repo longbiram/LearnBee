@@ -1,54 +1,8 @@
 import { useRef, useEffect, useState } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import {
-  Users, ClipboardCheck, CreditCard,
-  FileText, BookOpen, Smartphone
-} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { features } from '../../data/features';
 
-const features = [
-  {
-    icon: Users,
-    title: 'Student Management',
-    desc: 'Complete student profiles, enrollment, transfers, and academic history in one unified view.',
-    color: '#4F8EF7',
-    depth: 0,
-  },
-  {
-    icon: ClipboardCheck,
-    title: 'Attendance Tracking',
-    desc: 'Real-time attendance with automatic parent alerts via SMS and in-app notifications.',
-    color: '#8B5CF6',
-    depth: 1,
-  },
-  {
-    icon: CreditCard,
-    title: 'Fees & Billing',
-    desc: 'Automated fee scheduling, online payments, receipts, and financial reconciliation.',
-    color: '#EC4899',
-    depth: 2,
-  },
-  {
-    icon: FileText,
-    title: 'Exam & Results',
-    desc: 'Exam scheduling, marks entry, report card generation, and result analytics.',
-    color: '#F59E0B',
-    depth: 0,
-  },
-  {
-    icon: BookOpen,
-    title: 'Teacher Dashboard',
-    desc: 'Class sessions, subject assignments, homework tracking, and performance insights.',
-    color: '#10B981',
-    depth: 1,
-  },
-  {
-    icon: Smartphone,
-    title: 'Parent Portal',
-    desc: 'Parents get instant access to attendance, results, fee receipts, and school notices.',
-    color: '#6366F1',
-    depth: 2,
-  },
-];
 
 function TiltCard({ feat, index, isMobile }: { feat: typeof features[0]; index: number; isMobile: boolean }) {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -117,12 +71,12 @@ function TiltCard({ feat, index, isMobile }: { feat: typeof features[0]; index: 
         <p style={{ fontSize: 14, lineHeight: 1.65, color: 'rgba(255,255,255,0.5)' }}>{desc}</p>
       </div>
 
-      <div style={{ display:'flex', alignItems:'center', gap:6, color:color, fontSize:13, fontWeight:600, marginTop:'auto' }}>
+      <Link to={`/features/${feat.id}`} style={{ display:'flex', alignItems:'center', gap:6, color:color, fontSize:13, fontWeight:600, marginTop:'auto', textDecoration:'none' }}>
         <span>Learn more</span>
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <path d="M3 7H11M8 4L11 7L8 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-      </div>
+      </Link>
     </motion.div>
   );
 }

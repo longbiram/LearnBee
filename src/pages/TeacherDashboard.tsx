@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   LogOut, LayoutDashboard, Calendar,
   ClipboardList, Search, Bell, User, X, ChevronDown,
-  Users, Mail, Shield, Settings
+  Users, Mail, Shield, Settings, Menu
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -15,6 +15,17 @@ export default function TeacherDashboard() {
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 1024;
+      if (mobile) setSidebarOpen(false);
+      else setSidebarOpen(true);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -61,7 +72,7 @@ export default function TeacherDashboard() {
       <div style={{ minHeight: '100vh', display: 'flex', background: '#f1f5f9', fontFamily: 'Outfit, sans-serif' }}>
 
         {/* ── Sidebar ─────────────────────────────────────── */}
-        <div style={{ width: 240, background: '#0f172a', color: '#fff', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <div style={{ width: sidebarOpen ? 240 : 0, background: '#0f172a', color: '#fff', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden', transition: 'width 0.25s' }}>
           <div style={{ padding: '22px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ background: '#fff', width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
               <img src={learnBeeLogo} alt="LearnBee Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
@@ -129,6 +140,9 @@ export default function TeacherDashboard() {
             padding: '0 28px', gap: 16, flexShrink: 0,
             position: 'sticky', top: 0, zIndex: 100,
           }}>
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 6, borderRadius: 8 }}>
+              {sidebarOpen ? <X size={20} color="#475569" /> : <Menu size={20} color="#475569" />}
+            </button>
             {/* Page title */}
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: 17, fontWeight: 700, color: '#1e293b' }}>Teacher Dashboard</span>
@@ -387,7 +401,7 @@ export default function TeacherDashboard() {
               <p style={{ color: '#64748b', fontSize: 14 }}>Here is a summary of your assigned classes and subjects.</p>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 28 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
               {[
                 { label: 'Assigned Classes', value: '--', color: '#7c3aed', bg: 'rgba(124,58,237,0.08)', icon: <Users size={22} color="#7c3aed" /> },
                 { label: 'Total Subjects', value: '--', color: '#16a34a', bg: 'rgba(22,163,74,0.08)', icon: <ClipboardList size={22} color="#16a34a" /> },

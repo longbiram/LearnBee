@@ -137,6 +137,20 @@ export interface ErpLibraryIssue {
   staff?: { profiles: { full_name: string } };
 }
 
+export interface ErpLeaveRequest {
+  id: string;
+  school_id: string;
+  teacher_id: string;
+  leave_type: string;
+  start_date: string;
+  end_date: string;
+  reason: string;
+  status: string;
+  rejection_reason?: string;
+  created_at: string;
+  teacher_name?: string;
+}
+
 // ─── Hook: classes + sessions ────────────────────────────────
 export function useErpClasses(schoolId: string | null) {
   const [classes, setClasses] = useState<ErpClass[]>([]);
@@ -334,6 +348,26 @@ export function useLibraryIssues(schoolId: string | null, status?: string) {
   return { issues, loading, error, refetch: fetch };
 }
 
+export function useErpLeaveRequests(schoolId: string | null, teacherId?: string | null) {
+  const [leaveRequests, setLeaveRequests] = useState<ErpLeaveRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!schoolId) return;
+    setLoading(true);
+    setError(null);
+    invokeAcademics('getLeaveRequests', { school_id: schoolId, teacher_id: teacherId })
+      .then(d => setLeaveRequests(Array.isArray(d) ? d : []))
+      .catch((e: any) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [schoolId, teacherId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { leaveRequests, loading, error, refetch: fetch };
+}
+
 // ─── One-shot mutators (not hooks) ───────────────────────────
 export async function createStaff(payload: object) {
   return invokeAcademics('createStaff', payload);
@@ -468,6 +502,15 @@ export async function getLibraryIssues(payload: object) {
 export async function getAttendance(payload: object) {
   return invokeAcademics('getAttendance', payload);
 }
+
 export async function saveAttendance(payload: object) {
   return invokeAcademics('saveAttendance', payload);
+}
+
+export async function updateLeaveRequest(payload: object) {
+  return invokeAcademics('updateLeaveRequest', payload);
+}
+
+export async function createLeaveRequest(payload: object) {
+  return invokeAcademics('createLeaveRequest', payload);
 }

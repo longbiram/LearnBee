@@ -96,6 +96,9 @@ serve(async (req) => {
             case 'returnLibraryBook': return await returnLibraryBook(supabaseAdmin, user, payload);
             case 'getLibraryIssues': return await getLibraryIssues(supabaseAdmin, user, payload);
             case 'getStudents': return await getStudents(supabaseAdmin, user, payload);
+            case 'getLeaveRequests': return await getLeaveRequests(supabaseAdmin, user, payload);
+            case 'updateLeaveRequest': return await updateLeaveRequest(supabaseAdmin, user, payload);
+            case 'createLeaveRequest': return await createLeaveRequest(supabaseAdmin, user, payload);
             default: throw new Error(`Unsupported method: ${method}`);
         }
 
@@ -890,6 +893,164 @@ async function saveRoutine(supabaseAdmin: any, user: any, payload: any) {
         .select()
         .single();
 
+    if (error) throw error;
+    return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+
+async function getLeaveRequests(supabaseAdmin: any, user: any, payload: any) {
+    const { school_id, teacher_id } = payload;
+    if (!school_id) throw new Error('Missing required fields: school_id');
+    
+    let query = supabaseAdmin
+        .from('erp_leave_requests')
+        .select(`
+            *,
+            staff!teacher_id(id, profiles!profile_id(full_name))
+        `)
+        .eq('school_id', school_id);
+        
+    if (teacher_id) query = query.eq('teacher_id', teacher_id);
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
+        
+    if (error) throw error;
+    
+    const result = (data || []).map((row: any) => ({
+        ...row,
+        teacher_name: row.staff?.profiles?.full_name || 'Unknown'
+    }));
+    
+    return new Response(JSON.stringify(result), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+
+async function updateLeaveRequest(supabaseAdmin: any, user: any, payload: any) {
+    const { id, school_id, status, rejection_reason } = payload;
+    if (!id || !school_id || !status) throw new Error('Missing required fields');
+    
+    const updateObj: any = { status };
+    if (rejection_reason !== undefined) updateObj.rejection_reason = rejection_reason;
+    
+    const { data, error } = await supabaseAdmin
+        .from('erp_leave_requests')
+        .update(updateObj)
+        .eq('id', id)
+        .eq('school_id', school_id)
+        .select()
+        .single();
+        
+    if (error) throw error;
+
+    // Send email to teacher
+    try {
+        const { data: staffData } = await supabaseAdmin.from('staff').select('profile_id').eq('id', data.teacher_id).single();
+        if (staffData?.profile_id) {
+            const { data: userData } = await supabaseAdmin.auth.admin.getUserById(staffData.profile_id);
+            const teacherEmail = userData?.user?.email;
+            const teacherName = userData?.user?.user_metadata?.full_name || 'Teacher';
+            
+            // Fetch school info
+            const { data: schoolData } = await supabaseAdmin.from('schools').select('name, logo_url').eq('id', school_id).single();
+            const schoolName = schoolData?.name || 'Your School';
+            const schoolLogo = schoolData?.logo_url || '';
+            
+            if (teacherEmail) {
+                const resendApiKey = Deno.env.get('RESEND_API_KEY');
+                if (resendApiKey) {
+                    const htmlContent = `
+                        <div style="background-color: #f8fafc; padding: 40px 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+                            <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow: hidden;">
+                                <div style="background-color: #ffffff; padding: 30px; text-align: center; border-bottom: 1px solid #f1f5f9;">
+                                    ${schoolLogo ? `<img src="${schoolLogo}" alt="${schoolName}" style="max-height: 60px; margin-bottom: 15px;" />` : ''}
+                                    <h2 style="margin: 0; color: #1e293b; font-size: 20px; font-weight: 700;">${schoolName}</h2>
+                                </div>
+                                <div style="padding: 30px;">
+                                    <p style="margin-top: 0; color: #475569; font-size: 16px; line-height: 1.6;">Dear <strong>${teacherName}</strong>,</p>
+                                    <p style="color: #475569; font-size: 16px; line-height: 1.6;">Your leave request has been processed. Here are the details:</p>
+                                    
+                                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                                        <table style="width: 100%; border-collapse: collapse;">
+                                            <tr>
+                                                <td style="padding: 5px 0; color: #64748b; font-size: 14px;">Leave Type:</td>
+                                                <td style="padding: 5px 0; color: #1e293b; font-size: 14px; font-weight: 600;">${data.leave_type || 'N/A'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 5px 0; color: #64748b; font-size: 14px;">Duration:</td>
+                                                <td style="padding: 5px 0; color: #1e293b; font-size: 14px; font-weight: 600;">${data.start_date} to ${data.end_date}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 5px 0; color: #64748b; font-size: 14px;">Status:</td>
+                                                <td style="padding: 5px 0;">
+                                                    <span style="display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; text-transform: capitalize; 
+                                                        ${data.status === 'approved' ? 'background-color: #dcfce7; color: #16a34a;' : 'background-color: #fee2e2; color: #dc2626;'}">
+                                                        ${data.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            ${data.status === 'rejected' && data.rejection_reason ? `
+                                            <tr>
+                                                <td style="padding: 5px 0; color: #64748b; font-size: 14px;">Reason:</td>
+                                                <td style="padding: 5px 0; color: #dc2626; font-size: 14px; font-weight: 500;">${data.rejection_reason}</td>
+                                            </tr>
+                                            ` : ''}
+                                        </table>
+                                    </div>
+                                    
+                                    <p style="color: #475569; font-size: 16px; line-height: 1.6;">If you have any questions, please contact the school administration.</p>
+                                    <p style="margin-bottom: 0; color: #475569; font-size: 16px; line-height: 1.6;">Regards,<br/><strong>${schoolName}</strong></p>
+                                </div>
+                                <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #f1f5f9;">
+                                    <p style="margin: 0; color: #94a3b8; font-size: 12px;">This is an automated notification. Please do not reply to this email.</p>
+                                    <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px; font-weight: 600;">LearnBee ERP</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    await fetch('https://api.resend.com/emails', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${resendApiKey}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            from: `${schoolName} <onboarding@resend.dev>`,
+                            to: teacherEmail,
+                            subject: `Leave Request ${data.status.toUpperCase()} - ${schoolName}`,
+                            html: htmlContent
+                        })
+                    });
+                } else {
+                    console.warn('[updateLeaveRequest] RESEND_API_KEY is not set. Email not sent.');
+                }
+            }
+        }
+    } catch (emailErr) {
+        console.error('[updateLeaveRequest] Failed to send email:', emailErr);
+    }
+
+    return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+
+async function createLeaveRequest(supabaseAdmin: any, user: any, payload: any) {
+    const { school_id, teacher_id, leave_type, start_date, end_date, reason } = payload;
+    if (!school_id || !teacher_id || !leave_type || !start_date || !end_date || !reason) {
+        throw new Error('Missing required fields');
+    }
+    
+    const { data, error } = await supabaseAdmin
+        .from('erp_leave_requests')
+        .insert({
+            school_id,
+            teacher_id,
+            leave_type,
+            start_date,
+            end_date,
+            reason,
+            status: 'pending'
+        })
+        .select()
+        .single();
+        
     if (error) throw error;
     return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }

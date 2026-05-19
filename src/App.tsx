@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import WatchDemo from './pages/WatchDemo';
 import ScheduleDemo from './pages/ScheduleDemo';
+import FeatureDetail from './pages/FeatureDetail';
 import ResetPassword from './pages/ResetPassword';
 import About from './pages/static/About';
 import Blog from './pages/static/Blog';
@@ -25,6 +26,7 @@ import TeacherRoutine from './pages/teacher/TeacherRoutine';
 import TeacherAttendance from './pages/teacher/TeacherAttendance';
 import TeacherResults from './pages/teacher/TeacherResults';
 import TeacherNotice from './pages/teacher/TeacherNotice';
+import TeacherLeave from './pages/teacher/TeacherLeave';
 import TeacherSettings from './pages/teacher/TeacherSettings';
 
 // Staff role dashboards
@@ -46,6 +48,7 @@ import AllTeachers from './pages/admin/teachers/AllTeachers';
 import AddTeacher from './pages/admin/teachers/AddTeacher';
 import EditTeacher from './pages/admin/teachers/EditTeacher';
 import ResignedTeachers from './pages/admin/teachers/ResignedTeachers';
+import TeacherLeaveRequests from './pages/admin/teachers/LeaveRequests';
 import AdminTeacherAttendance from './pages/admin/teachers/TeacherAttendance';
 import AllStaffs from './pages/admin/staffs/AllStaffs';
 import AddStaff from './pages/admin/staffs/AddStaff';
@@ -81,6 +84,7 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/watch-demo" element={<WatchDemo />} />
         <Route path="/schedule-demo" element={<ScheduleDemo />} />
+        <Route path="/features/:featureId" element={<FeatureDetail />} />
         <Route path="/about" element={<About />} />
         <Route path="/blog" element={<Blog />} />
         <Route path="/careers" element={<Careers />} />
@@ -100,6 +104,7 @@ function App() {
         <Route path="/teacher/attendance" element={<TeacherAttendance />} />
         <Route path="/teacher/results" element={<TeacherResults />} />
         <Route path="/teacher/notice" element={<TeacherNotice />} />
+        <Route path="/teacher/leave" element={<TeacherLeave />} />
         <Route path="/teacher/settings" element={<TeacherSettings />} />
 
         {/* Staff dashboards */}
@@ -120,6 +125,7 @@ function App() {
         <Route path="/school-admin/teachers/add" element={<AddTeacher />} />
         <Route path="/school-admin/teachers/edit/:id" element={<EditTeacher />} />
         <Route path="/school-admin/teachers/resigned" element={<ResignedTeachers />} />
+        <Route path="/school-admin/teachers/leave-requests" element={<TeacherLeaveRequests />} />
         <Route path="/school-admin/teacher-attendance" element={<AdminTeacherAttendance />} />
         <Route path="/school-admin/staffs" element={<AllStaffs />} />
         <Route path="/school-admin/staffs/add" element={<AddStaff />} />

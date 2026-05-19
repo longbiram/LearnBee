@@ -5,7 +5,7 @@ import {
   LayoutDashboard, UserCheck,
   CalendarDays, Bell, LogOut,
   Search, ChevronDown, ChevronRight, Menu, X, BarChart2,
-  User, Mail, Shield, Settings, ShoppingBag,
+  User, Mail, Shield, Settings, ShoppingBag, Clock
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSchoolInfo, getNotifications, markNotificationsRead } from '../hooks/useErpAcademics';
@@ -25,6 +25,7 @@ const navItems: NavItem[] = [
   { icon: UserCheck,      label: 'Attendance', to: '/teacher/attendance' },
   { icon: BarChart2,      label: 'Results',    to: '/teacher/results' },
   { icon: Bell,           label: 'Notice',     to: '/teacher/notice' },
+  { icon: Clock,          label: 'Leave',      to: '/teacher/leave' },
   { icon: ShoppingBag,    label: 'Apps',       to: '/school-admin/apps' },
 ];
 
@@ -52,8 +53,24 @@ export default function TeacherLayout({ children, pageTitle, pageSubtitle }: {
   const navigate     = useNavigate();
   const parentLabel  = getParentLabel(location.pathname);
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile]     = useState(() => window.innerWidth < 1024);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024);
   const [openNav,     setOpenNav]     = useState<string | null>(parentLabel ?? 'Dashboard');
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (!mobile) setSidebarOpen(true);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Close sidebar when navigating on mobile
+  useEffect(() => {
+    if (isMobile) setSidebarOpen(false);
+  }, [location.pathname]);
   const [searchOpen,  setSearchOpen]  = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [notifOpen,   setNotifOpen]   = useState(false);
@@ -138,14 +155,27 @@ export default function TeacherLayout({ children, pageTitle, pageSubtitle }: {
     <ProtectedRoute allowedRoles={['teacher']}>
       <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc', fontFamily: 'Outfit, system-ui, sans-serif' }}>
 
+        {/* Mobile overlay backdrop */}
+        {isMobile && (
+          <div
+            className={`sidebar-overlay ${sidebarOpen ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* ── Sidebar ─────────────────────────────────────────── */}
-        <aside style={{
-          width: sidebarOpen ? 240 : 0, minWidth: sidebarOpen ? 240 : 0,
-          background: '#1e293b', borderRight: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex', flexDirection: 'column', height: '100vh',
-          position: 'sticky', top: 0, overflowY: 'auto', overflowX: 'hidden',
-          transition: 'width .25s, min-width .25s', zIndex: 100,
-        }}>
+        <aside
+          className={isMobile ? `dashboard-sidebar-mobile ${sidebarOpen ? 'open' : ''}` : ''}
+          style={{
+            width: isMobile ? 240 : (sidebarOpen ? 240 : 0),
+            minWidth: isMobile ? 240 : (sidebarOpen ? 240 : 0),
+            background: '#1e293b', borderRight: '1px solid rgba(255,255,255,0.05)',
+            display: 'flex', flexDirection: 'column', height: '100vh',
+            position: isMobile ? 'fixed' : 'sticky', top: 0,
+            overflowY: 'auto', overflowX: 'hidden',
+            transition: isMobile ? 'transform 0.3s ease' : 'width .25s, min-width .25s',
+            zIndex: 100,
+          }}>
           {/* Logo */}
           <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
             <div style={{ background: '#fff', width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
@@ -244,9 +274,9 @@ export default function TeacherLayout({ children, pageTitle, pageSubtitle }: {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
           {/* ── Top Header ─────────────────────────────────── */}
-          <header style={{
+          <header className="dashboard-header" style={{
             background: '#fff', borderBottom: '1px solid #e5e7eb',
-            padding: '0 24px', height: 64, display: 'flex', alignItems: 'center',
+            padding: isMobile ? '0 16px' : '0 24px', height: 64, display: 'flex', alignItems: 'center',
             justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 90, gap: 16,
           }}>
             {/* Left: hamburger + school */}
@@ -489,10 +519,10 @@ export default function TeacherLayout({ children, pageTitle, pageSubtitle }: {
           </header>
 
           {/* ── Page content ──────────────────────────────── */}
-          <main style={{ flex: 1, padding: '28px', overflowY: 'auto' }}>
+          <main className="dashboard-main-content" style={{ flex: 1, padding: isMobile ? '16px' : '28px', overflowY: 'auto', minWidth: 0 }}>
             <div style={{ marginBottom: 22 }}>
-              <h1 style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', margin: 0 }}>{pageTitle}</h1>
-              {pageSubtitle && <p style={{ fontSize: 13, color: '#94a3b8', margin: '4px 0 0' }}>{pageSubtitle}</p>}
+              <h1 style={{ fontSize: isMobile ? 18 : 20, fontWeight: 800, color: '#1e293b', margin: 0 }}>{pageTitle}</h1>
+              {pageSubtitle && <p style={{ fontSize: isMobile ? 12 : 13, color: '#94a3b8', margin: '4px 0 0' }}>{pageSubtitle}</p>}
             </div>
             {children}
           </main>

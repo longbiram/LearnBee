@@ -27,13 +27,14 @@ const navItems: NavItem[] = [
     { label: 'Transfer (TC)', to: '/school-admin/students/transfer' },
     { label: 'ID Cards',      to: '/school-admin/students/id-cards' },
   ]},
-  { icon: BookOpen, label: 'Teachers', children: [
-    { label: 'All Teachers',    to: '/school-admin/teachers' },
-    { label: 'Add Teacher',     to: '/school-admin/teachers/add' },
-    { label: 'Resigned',        to: '/school-admin/teachers/resigned' },
-    { label: 'Class Teachers',  to: '/school-admin/class-teachers' },
-    { label: 'ID Cards',        to: '/school-admin/teachers/id-cards' },
-  ]},
+    { icon: BookOpen, label: 'Teachers', children: [
+      { label: 'All Teachers',    to: '/school-admin/teachers' },
+      { label: 'Add Teacher',     to: '/school-admin/teachers/add' },
+      { label: 'Leave Requests',  to: '/school-admin/teachers/leave-requests' },
+      { label: 'Resigned',        to: '/school-admin/teachers/resigned' },
+      { label: 'Class Teachers',  to: '/school-admin/class-teachers' },
+      { label: 'ID Cards',        to: '/school-admin/teachers/id-cards' },
+    ]},
   { icon: Users, label: 'Staffs', children: [
     { label: 'All Staffs', to: '/school-admin/staffs' },
     { label: 'Add Staff',  to: '/school-admin/staffs/add' },
@@ -77,9 +78,25 @@ export default function AdminLayout({ children, pageTitle, pageSubtitle }: {
 }) {
   const { schoolId, profile, user, signOut } = useAuth();
   const { school } = useSchoolInfo(schoolId);
-  const location  = useLocation();
-  const navigate  = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024);
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (!mobile) setSidebarOpen(true);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Close sidebar when navigating on mobile
+  useEffect(() => {
+    if (isMobile) setSidebarOpen(false);
+  }, [location.pathname, isMobile]);
 
   // Upgrade staff gating
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -298,15 +315,27 @@ export default function AdminLayout({ children, pageTitle, pageSubtitle }: {
       )}
       <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc', fontFamily: 'Outfit, system-ui, sans-serif' }}>
 
+        {/* Mobile overlay backdrop */}
+        {isMobile && (
+          <div
+            className={`sidebar-overlay ${sidebarOpen ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
         {/* ── Sidebar ───────────────────────────────── */}
-        <aside style={{
-          width: sidebarOpen ? 240 : 0, minWidth: sidebarOpen ? 240 : 0,
-          background: '#fff', borderRight: '1px solid #e5e7eb',
-          display: 'flex', flexDirection: 'column', height: '100vh',
-          position: 'sticky', top: 0, overflowY: 'auto', overflowX: 'hidden',
-          transition: 'width .25s, min-width .25s', zIndex: 100,
-        }}>
+        <aside
+          className={isMobile ? `dashboard-sidebar-mobile ${sidebarOpen ? 'open' : ''}` : ''}
+          style={{
+            width: isMobile ? 240 : (sidebarOpen ? 240 : 0),
+            minWidth: isMobile ? 240 : (sidebarOpen ? 240 : 0),
+            background: '#fff', borderRight: '1px solid #e5e7eb',
+            display: 'flex', flexDirection: 'column', height: '100vh',
+            position: isMobile ? 'fixed' : 'sticky', top: 0,
+            overflowY: 'auto', overflowX: 'hidden',
+            transition: isMobile ? 'transform 0.3s ease' : 'width .25s, min-width .25s',
+            zIndex: 100,
+          }}>
           {/* Logo */}
           <div style={{ padding: '20px 20px 14px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
@@ -408,9 +437,9 @@ export default function AdminLayout({ children, pageTitle, pageSubtitle }: {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
           {/* Top bar */}
-          <header style={{
+          <header className="dashboard-header" style={{
             background: '#fff', borderBottom: '1px solid #e5e7eb',
-            padding: '0 24px', height: 64, display: 'flex', alignItems: 'center',
+            padding: isMobile ? '0 16px' : '0 24px', height: 64, display: 'flex', alignItems: 'center',
             justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 90, gap: 16,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -657,10 +686,10 @@ export default function AdminLayout({ children, pageTitle, pageSubtitle }: {
           </header>
 
           {/* Page content */}
-          <main style={{ flex: 1, padding: '28px', overflowY: 'auto' }}>
+          <main className="dashboard-main-content" style={{ flex: 1, padding: isMobile ? '16px' : '28px', overflowY: 'auto', minWidth: 0 }}>
             <div style={{ marginBottom: 22 }}>
-              <h1 style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', margin: 0 }}>{pageTitle}</h1>
-              {pageSubtitle && <p style={{ fontSize: 13, color: '#94a3b8', margin: '4px 0 0' }}>{pageSubtitle}</p>}
+              <h1 style={{ fontSize: isMobile ? 18 : 20, fontWeight: 800, color: '#1e293b', margin: 0 }}>{pageTitle}</h1>
+              {pageSubtitle && <p style={{ fontSize: isMobile ? 12 : 13, color: '#94a3b8', margin: '4px 0 0' }}>{pageSubtitle}</p>}
             </div>
             {children}
           </main>

@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, Building, Calendar, Clock, Check, Users } from 'lucide-react';
 import PageLayout from '../components/PageLayout';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const timeSlots = ['9:00 AM','10:00 AM','11:00 AM','12:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM'];
 const demoPerks = [
@@ -14,8 +17,17 @@ const demoPerks = [
 
 export default function ScheduleDemo() {
   const [selectedSlot, setSelectedSlot] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   if (submitted) return (
     <PageLayout maxWidth={600}>
@@ -63,10 +75,45 @@ export default function ScheduleDemo() {
         </p>
       </motion.div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 340px', gap:28 }}>
+      <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap:28 }}>
         {/* Form */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.2, duration:0.6 }}>
-          <form onSubmit={e => { e.preventDefault(); if(selectedSlot) setSubmitted(true); else alert('Please select a time slot.'); }}
+          <form onSubmit={async (e) => { 
+              e.preventDefault(); 
+              if(!selectedSlot) return alert('Please select a time slot.'); 
+              if(!selectedDate) return alert('Please select a preferred date.');
+
+              setLoading(true);
+              const formData = new FormData(e.currentTarget);
+              try {
+                const res = await fetch(`${SUPABASE_URL}/functions/v1/saas-platform/book-demo`, {
+                  method: 'POST',
+                  headers: { 'apikey': ANON_KEY, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    firstName: formData.get('firstName'),
+                    lastName: formData.get('lastName'),
+                    workEmail: formData.get('workEmail'),
+                    phoneNumber: formData.get('phoneNumber'),
+                    schoolName: formData.get('schoolName'),
+                    schoolSize: formData.get('schoolSize'),
+                    preferredDate: selectedDate,
+                    preferredTimeSlot: selectedSlot
+                  })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to book demo');
+                
+                if (!data.emailSent) {
+                  console.warn('[EMAIL] Failed to send email:', data.emailError);
+                }
+                setSubmitted(true);
+              } catch (err) {
+                console.error(err);
+                alert('An error occurred while booking the demo. Please try again.');
+              } finally {
+                setLoading(false);
+              }
+            }}
             style={{
               background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)',
               borderRadius:20, padding:'32px',
@@ -74,13 +121,13 @@ export default function ScheduleDemo() {
             }}>
             <h3 style={{ fontSize:17, fontWeight:700, color:'#fff', marginBottom:0 }}>Your Information</h3>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-              {[{ icon:User, label:'First Name', ph:'Priya' },{ icon:User, label:'Last Name', ph:'Sharma' }].map(({ icon:Icon, label, ph }) => (
+            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:16 }}>
+              {[{ icon:User, label:'First Name', ph:'Priya', name: 'firstName' },{ icon:User, label:'Last Name', ph:'Sharma', name: 'lastName' }].map(({ icon:Icon, label, ph, name }) => (
                 <div key={label}>
                   <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>{label}</label>
                   <div style={{ position:'relative' }}>
                     <Icon size={14} color="rgba(255,255,255,0.25)" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}/>
-                    <input placeholder={ph} required style={{ width:'100%', padding:'10px 12px 10px 36px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:10, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                    <input name={name} placeholder={ph} required style={{ width:'100%', padding:'10px 12px 10px 36px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:10, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
                       onFocus={e => e.target.style.borderColor='rgba(139,92,246,0.5)'}
                       onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.09)'}/>
                   </div>
@@ -89,15 +136,15 @@ export default function ScheduleDemo() {
             </div>
 
             {[
-              { icon:Mail,     label:'Work Email',   ph:'admin@yourschool.com', type:'email' },
-              { icon:Phone,    label:'Phone Number', ph:'+91 60028 79151',      type:'tel'   },
-              { icon:Building, label:'School Name',  ph:'Delhi Public School',  type:'text'  },
-            ].map(({ icon:Icon, label, ph, type }) => (
+              { icon:Mail,     label:'Work Email',   ph:'admin@yourschool.com', type:'email', name: 'workEmail' },
+              { icon:Phone,    label:'Phone Number', ph:'+91 60000 77777',      type:'tel', name: 'phoneNumber' },
+              { icon:Building, label:'School Name',  ph:'Delhi Public School',  type:'text', name: 'schoolName' },
+            ].map(({ icon:Icon, label, ph, type, name }) => (
               <div key={label}>
                 <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>{label}</label>
                 <div style={{ position:'relative' }}>
                   <Icon size={14} color="rgba(255,255,255,0.25)" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}/>
-                  <input type={type} placeholder={ph} required style={{ width:'100%', padding:'10px 12px 10px 36px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:10, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                  <input name={name} type={type} placeholder={ph} required style={{ width:'100%', padding:'10px 12px 10px 36px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:10, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
                     onFocus={e => e.target.style.borderColor='rgba(139,92,246,0.5)'}
                     onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.09)'}/>
                 </div>
@@ -106,44 +153,62 @@ export default function ScheduleDemo() {
 
             <div>
               <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>School Size</label>
-              <select required style={{ width:'100%', padding:'10px 14px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:10, color:'rgba(255,255,255,0.7)', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+              <select name="schoolSize" required style={{ width:'100%', padding:'10px 14px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:10, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
                 onFocus={e => e.target.style.borderColor='rgba(139,92,246,0.5)'}
                 onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.09)'}>
-                <option value="" style={{ background:'#111' }}>Select student count</option>
+                <option value="" style={{ background:'#111', color:'#fff' }}>Select student count</option>
                 {['Under 200','200–500','500–1,500','1,500–5,000','5,000+'].map(r => (
-                  <option key={r} value={r} style={{ background:'#111' }}>{r} Students</option>
+                  <option key={r} value={r} style={{ background:'#111', color:'#fff' }}>{r} Students</option>
                 ))}
               </select>
             </div>
 
-            <div>
-              <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:10 }}>
-                <Clock size={13} style={{ marginRight:5, verticalAlign:'middle' }}/>Preferred Time Slot (IST)
-              </label>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
-                {timeSlots.map(slot => (
-                  <button key={slot} type="button" onClick={() => setSelectedSlot(slot)}
-                    style={{
-                      padding:'8px 4px', borderRadius:9, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit',
-                      border: selectedSlot === slot ? '1px solid rgba(139,92,246,0.7)' : '1px solid rgba(255,255,255,0.09)',
-                      background: selectedSlot === slot ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)',
-                      color: selectedSlot === slot ? '#a78bfa' : 'rgba(255,255,255,0.55)',
-                      transition:'all 0.15s',
-                    }}
-                  >{slot}</button>
-                ))}
+            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:16 }}>
+              <div>
+                <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:10 }}>
+                  <Calendar size={13} style={{ marginRight:5, verticalAlign:'middle' }}/>Preferred Date
+                </label>
+                <input 
+                  type="date" 
+                  required 
+                  min={new Date().toISOString().split('T')[0]}
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  style={{ width:'100%', padding:'10px 12px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:10, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                  onFocus={e => e.target.style.borderColor='rgba(139,92,246,0.5)'}
+                  onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.09)'}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:10 }}>
+                  <Clock size={13} style={{ marginRight:5, verticalAlign:'middle' }}/>Preferred Time Slot (IST)
+                </label>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
+                  {timeSlots.map(slot => (
+                    <button key={slot} type="button" onClick={() => setSelectedSlot(slot)}
+                      style={{
+                        padding:'8px 4px', borderRadius:9, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit',
+                        border: selectedSlot === slot ? '1px solid rgba(139,92,246,0.7)' : '1px solid rgba(255,255,255,0.09)',
+                        background: selectedSlot === slot ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)',
+                        color: selectedSlot === slot ? '#a78bfa' : 'rgba(255,255,255,0.55)',
+                        transition:'all 0.15s',
+                      }}
+                    >{slot}</button>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <motion.button type="submit" whileHover={{ scale:1.02 }} whileTap={{ scale:0.98 }}
+            <motion.button type="submit" disabled={loading} whileHover={{ scale: loading ? 1 : 1.02 }} whileTap={{ scale: loading ? 1 : 0.98 }}
               style={{
                 padding:'14px', background:'linear-gradient(135deg,#4F8EF7,#8B5CF6)',
                 border:'none', borderRadius:12, color:'#fff', fontSize:15, fontWeight:700,
-                cursor:'pointer', fontFamily:'inherit',
+                cursor: loading ? 'not-allowed' : 'pointer', fontFamily:'inherit', opacity: loading ? 0.7 : 1,
                 boxShadow:'0 0 30px rgba(139,92,246,0.4)',
                 display:'flex', alignItems:'center', justifyContent:'center', gap:8,
               }}>
-              <Calendar size={17}/> Confirm & Schedule Demo
+              <Calendar size={17}/> {loading ? 'Scheduling...' : 'Confirm & Schedule Demo'}
             </motion.button>
           </form>
         </motion.div>

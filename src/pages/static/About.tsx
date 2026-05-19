@@ -4,10 +4,10 @@ import { GraduationCap, Users, Target, Heart, MapPin, ArrowRight } from 'lucide-
 import PageLayout from '../../components/PageLayout';
 
 const team = [
-  { name:'Arjun Mehta',    role:'CEO & Co-founder',       initial:'A', color:'#4F8EF7' },
-  { name:'Sneha Rao',      role:'CTO & Co-founder',       initial:'S', color:'#8B5CF6' },
-  { name:'Kiran Patel',    role:'Head of Product',        initial:'K', color:'#EC4899' },
-  { name:'Divya Nair',     role:'Head of Customer Success',initial:'D',color:'#10B981' },
+  { name:'Longbiram Bey',    role:'CEO & Co-founder',       initial:'L', color:'#4F8EF7' },
+  { name:'Cyrus Timung',      role:'CTO & Co-founder',       initial:'C', color:'#8B5CF6' },
+  { name:'Eva Enghipi',    role:'Head of Product',        initial:'E', color:'#EC4899' },
+  { name:'Rahul Tokbi',     role:'Head of Customer Success',initial:'R',color:'#10B981' },
 ];
 const values = [
   { icon:Target, title:'School-First Mindset',  desc:"Every feature is built by asking 'does this make school admin 10× easier?'", color:'#4F8EF7' },
@@ -28,14 +28,14 @@ export default function About() {
             We believe every school<br/>deserves <span style={{ background:'linear-gradient(135deg,#4F8EF7,#8B5CF6)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>enterprise tools</span>
           </h1>
           <p style={{ fontSize:17, color:'rgba(255,255,255,0.45)', maxWidth:580, margin:'0 auto', lineHeight:1.7 }}>
-            LearnBee ERP was founded in 2023 by educators-turned-engineers who were frustrated by outdated, overpriced school management software. We set out to build the ERP we always wished existed.
+            LearnBee ERP was founded in 2026 by educators-turned-engineers who were frustrated by outdated, overpriced school management software. We set out to build the ERP we always wished existed.
           </p>
         </motion.div>
       </div>
 
       {/* Stats */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:20, marginBottom:80 }}>
-        {[['2023','Founded'],['500+','Schools'],['1M+','Students Managed'],['99.9%','Uptime SLA']].map(([v,l], i) => (
+        {[['2026','Founded'],['50+','Schools'],['10K+','Students Managed'],['99.9%','Uptime SLA']].map(([v,l], i) => (
           <motion.div key={l} initial={{ opacity:0, y:20 }} whileInView={{ opacity:1, y:0 }}
             viewport={{ once:true }} transition={{ delay:i*0.1 }}
             style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:16, padding:'28px 24px', textAlign:'center' }}>
@@ -83,9 +83,9 @@ export default function About() {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
         <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:18, padding:28 }}>
           <MapPin size={24} color="#8B5CF6" style={{ marginBottom:14 }}/>
-          <h3 style={{ fontSize:18, fontWeight:700, color:'#fff', marginBottom:10 }}>Headquartered in India</h3>
+          <h3 style={{ fontSize:18, fontWeight:700, color:'#fff', marginBottom:10 }}>Headquartered in Diphu</h3>
           <p style={{ fontSize:14, color:'rgba(255,255,255,0.4)', lineHeight:1.7 }}>
-            LearnBee ERP is proudly built in Bengaluru, India — serving schools across South Asia and beyond.
+            LearnBee ERP is proudly built in Diphu, Karbi Anglong, Assam, India — serving schools across North-East India and beyond.
           </p>
         </div>
         <div style={{ background:'linear-gradient(135deg,rgba(79,142,247,0.08),rgba(139,92,246,0.08))', border:'1px solid rgba(139,92,246,0.2)', borderRadius:18, padding:28, display:'flex', flexDirection:'column', justifyContent:'center' }}>

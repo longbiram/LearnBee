@@ -37,7 +37,23 @@ export default function SuperAdminLayout({ children, pageTitle, pageSubtitle }: 
   const { profile, user, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024);
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (!mobile) setSidebarOpen(true);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Close sidebar when navigating on mobile
+  useEffect(() => {
+    if (isMobile) setSidebarOpen(false);
+  }, [location.pathname]);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,14 +92,27 @@ export default function SuperAdminLayout({ children, pageTitle, pageSubtitle }: 
     <ProtectedRoute allowedRoles={['super_admin']}>
       <div style={{ display: 'flex', minHeight: '100vh', background: '#0f172a', fontFamily: 'Outfit, system-ui, sans-serif' }}>
 
+        {/* Mobile overlay backdrop */}
+        {isMobile && (
+          <div
+            className={`sidebar-overlay ${sidebarOpen ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* ── Sidebar (Dark Theme for Super Admin) ───────────────────────────────── */}
-        <aside style={{
-          width: sidebarOpen ? 260 : 0, minWidth: sidebarOpen ? 260 : 0,
-          background: '#1e293b', borderRight: '1px solid #334155',
-          display: 'flex', flexDirection: 'column', height: '100vh',
-          position: 'sticky', top: 0, overflowY: 'auto', overflowX: 'hidden',
-          transition: 'width .25s, min-width .25s', zIndex: 100,
-        }}>
+        <aside
+          className={isMobile ? `dashboard-sidebar-mobile ${sidebarOpen ? 'open' : ''}` : ''}
+          style={{
+            width: isMobile ? 260 : (sidebarOpen ? 260 : 0),
+            minWidth: isMobile ? 260 : (sidebarOpen ? 260 : 0),
+            background: '#1e293b', borderRight: '1px solid #334155',
+            display: 'flex', flexDirection: 'column', height: '100vh',
+            position: isMobile ? 'fixed' : 'sticky', top: 0,
+            overflowY: 'auto', overflowX: 'hidden',
+            transition: isMobile ? 'transform 0.3s ease' : 'width .25s, min-width .25s',
+            zIndex: 100,
+          }}>
           {/* Logo */}
           <div style={{ padding: '24px 20px 20px', borderBottom: '1px solid #334155', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
@@ -189,10 +218,11 @@ export default function SuperAdminLayout({ children, pageTitle, pageSubtitle }: 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
           {/* Top bar */}
-          <header style={{
+          <header className="dashboard-header" style={{
             background: '#1e293b', borderBottom: '1px solid #334155',
-            padding: '0 28px', height: 72, display: 'flex', alignItems: 'center',
+            padding: isMobile ? '0 16px' : '0 28px', height: 72, display: 'flex', alignItems: 'center',
             justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 90, gap: 16,
+            flexShrink: 0,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <button onClick={() => setSidebarOpen(p => !p)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 8, borderRadius: 8, color: '#94a3b8' }}>
@@ -323,9 +353,9 @@ export default function SuperAdminLayout({ children, pageTitle, pageSubtitle }: 
           </header>
 
           {/* Page content */}
-          <main style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
+          <main className="dashboard-main-content" style={{ flex: 1, padding: isMobile ? '16px' : '32px', overflowY: 'auto', minWidth: 0 }}>
             <div style={{ marginBottom: 28 }}>
-              <h1 style={{ fontSize: 24, fontWeight: 800, color: '#f8fafc', margin: 0 }}>{pageTitle}</h1>
+              <h1 style={{ fontSize: isMobile ? 20 : 24, fontWeight: 800, color: '#f8fafc', margin: 0 }}>{pageTitle}</h1>
               {pageSubtitle && <p style={{ fontSize: 14, color: '#94a3b8', margin: '6px 0 0' }}>{pageSubtitle}</p>}
             </div>
             {children}

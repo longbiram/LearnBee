@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Play, Pause, Maximize2, Calendar, Clock, ChevronRight } from 'lucide-react';
@@ -17,7 +17,14 @@ const chapters = [
 
 export default function WatchDemo() {
   const [playing, setPlaying] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   return (
     <PageLayout maxWidth={1080}>
@@ -41,7 +48,7 @@ export default function WatchDemo() {
         </p>
       </motion.div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:28, alignItems:'start' }}>
+      <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', gap:28, alignItems:'start' }}>
         {/* Video player */}
         <motion.div initial={{ opacity:0, y:30 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.2, duration:0.7 }}>
           {/* Player box */}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, User, Phone, Building, MapPin, ArrowRight, Check, AlertCircle, Loader2 } from 'lucide-react';
@@ -15,7 +15,14 @@ const perks = [
 export default function Signup() {
   const [showPass, setShowPass] = useState(false);
   const [step, setStep] = useState(1);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Step 1: User Account State
   const [firstName, setFirstName] = useState('');
@@ -245,7 +252,7 @@ export default function Signup() {
 
           {step === 1 ? (
             <form onSubmit={e => { e.preventDefault(); setStep(2); }} style={{ display:'flex', flexDirection:'column', gap:16 }}>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+              <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:14 }}>
                 <div>
                   <label style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.5)', display:'block', marginBottom:7 }}>First Name</label>
                   <div style={{ position:'relative' }}>

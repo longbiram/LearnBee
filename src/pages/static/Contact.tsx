@@ -22,7 +22,7 @@ export default function Contact() {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/saas-platform/support-ticket`, {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/public-saas/support-ticket`, {
         method: 'POST',
         headers: {
           'apikey': ANON_KEY,

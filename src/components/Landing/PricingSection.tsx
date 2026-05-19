@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Check, Zap } from 'lucide-react';
 
@@ -8,11 +9,12 @@ const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export default function PricingSection() {
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function fetchPlans() {
       try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/saas-platform/plans`, {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/public-saas/plans`, {
           method: 'GET',
           headers: { 'apikey': ANON_KEY, 'Content-Type': 'application/json' }
         });
@@ -136,6 +138,7 @@ export default function PricingSection() {
               <p style={{ fontSize:13, color:'rgba(255,255,255,0.4)', marginBottom:28, lineHeight:1.6 }}>{description}</p>
 
               <motion.button
+                onClick={() => priceStr === 'Custom' ? null : navigate('/signup')}
                 whileHover={{ scale:1.03 }} whileTap={{ scale:0.97 }}
                 style={{
                   width:'100%', padding:'12px', borderRadius:12,

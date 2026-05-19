@@ -42,7 +42,7 @@ export default function Footer() {
       footerEmail: 'support@learnbee.in',
       footerPhone: '+91 60028 79151',
       footerAddress: 'Karbi Anglong, Assam, India 782460',
-      footerCopyright: '© 2025 LearnBee ERP. All rights reserved.',
+      footerCopyright: `© ${new Date().getFullYear()} LearnBee ERP. All rights reserved.`,
       socialTwitter: 'https://twitter.com/learnbee',
       socialLinkedin: 'https://linkedin.com/company/learnbee',
       socialGithub: 'https://github.com/learnbee',
@@ -171,7 +171,7 @@ export default function Footer() {
           flexDirection: isMobile ? 'column' : 'row',
         }}>
           <span style={{ fontSize:12, color:'rgba(255,255,255,0.25)' }}>
-            {frontend.footerCopyright}
+            {frontend.footerCopyright.replace(/\d{4}/, new Date().getFullYear().toString())}
           </span>
 
           {/* Social icons */}
