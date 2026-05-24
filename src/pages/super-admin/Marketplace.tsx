@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import SuperAdminLayout from '../../components/layout/SuperAdminLayout';
-import { Package, Upload, Plus, Search, Trash2, Edit2, ShieldCheck, Globe, Clock, Download, X, Loader2, ArrowUpCircle } from 'lucide-react';
+import { Package, Upload, Plus, Search, Trash2, Edit2, ShieldCheck, Globe, Clock, Download, X, Loader2, ArrowUpCircle, Building } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -9,6 +9,8 @@ const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export default function Marketplace() {
   const [modules, setModules] = useState<any[]>([]);
+  const [schools, setSchools] = useState<any[]>([]);
+  const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -23,7 +25,9 @@ export default function Marketplace() {
     version: '1.0.0',
     price: 0,
     is_free: true,
-    author: 'LearnBee Team'
+    author: 'LearnBee Team',
+    published_scope: 'general',
+    allowed_schools: [] as string[]
   });
   const [file, setFile] = useState<File | null>(null);
   const [thumbnail, setThumbnail] = useState<File | null>(null);
@@ -46,6 +50,7 @@ export default function Marketplace() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch modules');
       setModules(data.modules || []);
+      setSchools(data.schools || []);
     } catch (err) {
       console.error('Error fetching modules:', err);
     } finally {
@@ -123,8 +128,10 @@ export default function Marketplace() {
       setEditingModule(null);
       setFormData({
         name: '', slug: '', description: '', category: 'General',
-        version: '1.0.0', price: 0, is_free: true, author: 'LearnBee Team'
+        version: '1.0.0', price: 0, is_free: true, author: 'LearnBee Team',
+        published_scope: 'general', allowed_schools: []
       });
+      setSchoolSearchQuery('');
       setFile(null);
       setThumbnail(null);
       setThumbnailPreview(null);
@@ -147,7 +154,9 @@ export default function Marketplace() {
       version: module.version,
       price: module.price,
       is_free: module.is_free,
-      author: module.author
+      author: module.author,
+      published_scope: module.published_scope || 'general',
+      allowed_schools: module.allowed_schools || []
     });
     setThumbnailPreview(module.thumbnail_url);
     setShowUploadModal(true);
@@ -173,7 +182,9 @@ export default function Marketplace() {
       version: nextVersion,
       price: module.price,
       is_free: module.is_free,
-      author: module.author
+      author: module.author,
+      published_scope: module.published_scope || 'general',
+      allowed_schools: module.allowed_schools || []
     });
     setFile(null); // Force new file for update
     setThumbnailPreview(module.thumbnail_url);
@@ -224,7 +235,26 @@ export default function Marketplace() {
           />
         </div>
         <button 
-          onClick={() => setShowUploadModal(true)}
+          onClick={() => {
+            setEditingModule(null);
+            setIsReleasingUpdate(false);
+            setFormData({
+              name: '',
+              slug: '',
+              description: '',
+              category: 'General',
+              version: '1.0.0',
+              price: 0,
+              is_free: true,
+              author: 'LearnBee Team',
+              published_scope: 'general',
+              allowed_schools: []
+            });
+            setFile(null);
+            setThumbnail(null);
+            setThumbnailPreview(null);
+            setShowUploadModal(true);
+          }}
           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 20px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
         >
           <Plus size={18} /> Upload Module
@@ -257,6 +287,17 @@ export default function Marketplace() {
                 ) : (
                   <Package size={64} color="#6366f1" style={{ opacity: 0.5 }} />
                 )}
+                <div style={{ position: 'absolute', top: 12, left: 12, padding: '4px 10px', background: module.published_scope === 'specific' ? 'rgba(245, 158, 11, 0.95)' : 'rgba(99, 102, 241, 0.95)', borderRadius: 20, fontSize: 11, color: '#f8fafc', fontWeight: 700, backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', gap: 4, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                  {module.published_scope === 'specific' ? (
+                    <>
+                      <Building size={12} /> Specific ({module.allowed_schools?.length || 0})
+                    </>
+                  ) : (
+                    <>
+                      <Globe size={12} /> General
+                    </>
+                  )}
+                </div>
                 <div style={{ position: 'absolute', top: 12, right: 12, padding: '4px 10px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: 20, fontSize: 11, color: '#f8fafc', fontWeight: 600, backdropFilter: 'blur(4px)' }}>
                   v{module.version}
                 </div>
@@ -393,6 +434,124 @@ export default function Marketplace() {
                       style={{ width: '100%', padding: '12px 16px', background: '#0f172a', border: '1px solid #334155', borderRadius: 12, color: '#f8fafc', outline: 'none' }}
                     />
                   </div>
+                </div>
+
+                {/* Publication Scope Scoping Section */}
+                <div style={{ marginBottom: 20, background: '#0f172a', padding: 20, borderRadius: 16, border: '1px solid #334155' }}>
+                  <label style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#f8fafc', marginBottom: 12 }}>
+                    Publication Scope
+                  </label>
+                  <div style={{ display: 'flex', gap: 16, marginBottom: formData.published_scope === 'specific' ? 16 : 0 }}>
+                    <label 
+                      style={{ 
+                        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 16px', 
+                        background: formData.published_scope === 'general' ? 'rgba(99, 102, 241, 0.15)' : '#1e293b', 
+                        border: formData.published_scope === 'general' ? '1px solid #6366f1' : '1px solid #334155', 
+                        borderRadius: 12, color: formData.published_scope === 'general' ? '#f8fafc' : '#94a3b8', 
+                        cursor: 'pointer', transition: 'all 0.2s', fontWeight: 600 
+                      }}
+                    >
+                      <input 
+                        type="radio" name="published_scope" value="general" 
+                        checked={formData.published_scope === 'general'} 
+                        onChange={() => setFormData({...formData, published_scope: 'general'})}
+                        style={{ display: 'none' }} 
+                      />
+                      <Globe size={16} /> General (All Schools)
+                    </label>
+                    
+                    <label 
+                      style={{ 
+                        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 16px', 
+                        background: formData.published_scope === 'specific' ? 'rgba(245, 158, 11, 0.15)' : '#1e293b', 
+                        border: formData.published_scope === 'specific' ? '1px solid #f59e0b' : '1px solid #334155', 
+                        borderRadius: 12, color: formData.published_scope === 'specific' ? '#f8fafc' : '#94a3b8', 
+                        cursor: 'pointer', transition: 'all 0.2s', fontWeight: 600 
+                      }}
+                    >
+                      <input 
+                        type="radio" name="published_scope" value="specific" 
+                        checked={formData.published_scope === 'specific'} 
+                        onChange={() => setFormData({...formData, published_scope: 'specific'})}
+                        style={{ display: 'none' }} 
+                      />
+                      <Building size={16} /> Specific Schools
+                    </label>
+                  </div>
+
+                  {formData.published_scope === 'specific' && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      style={{ overflow: 'hidden' }}
+                    >
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 8, marginTop: 12 }}>
+                        Select Allowed Schools
+                      </label>
+                      <div style={{ position: 'relative', marginBottom: 12 }}>
+                        <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                        <input 
+                          type="text" 
+                          placeholder="Search schools..." 
+                          value={schoolSearchQuery}
+                          onChange={(e) => setSchoolSearchQuery(e.target.value)}
+                          style={{ width: '100%', padding: '10px 12px 10px 36px', background: '#1e293b', border: '1px solid #334155', borderRadius: 10, color: '#f8fafc', fontSize: 13, outline: 'none' }}
+                        />
+                      </div>
+                      
+                      <div style={{ maxHeight: 150, overflowY: 'auto', background: '#1e293b', borderRadius: 10, border: '1px solid #334155', padding: 8 }}>
+                        {schools.length === 0 ? (
+                          <div style={{ padding: '12px', color: '#64748b', fontSize: 13, textAlign: 'center' }}>No schools onboarded yet.</div>
+                        ) : (
+                          (() => {
+                            const filtered = schools.filter(school => school.name.toLowerCase().includes(schoolSearchQuery.toLowerCase()));
+                            if (filtered.length === 0) {
+                              return <div style={{ padding: '12px', color: '#64748b', fontSize: 13, textAlign: 'center' }}>No matching schools.</div>;
+                            }
+                            return filtered.map(school => {
+                              const isChecked = formData.allowed_schools.includes(school.id);
+                              return (
+                                <label 
+                                  key={school.id} 
+                                  style={{ 
+                                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, 
+                                    background: isChecked ? 'rgba(245, 158, 11, 0.1)' : 'transparent', 
+                                    cursor: 'pointer', transition: 'all 0.15s', color: isChecked ? '#f8fafc' : '#94a3b8',
+                                    fontSize: 13, marginBottom: 4, border: isChecked ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid transparent'
+                                  }}
+                                >
+                                  <input 
+                                    type="checkbox" 
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      const updatedList = e.target.checked 
+                                        ? [...formData.allowed_schools, school.id]
+                                        : formData.allowed_schools.filter(id => id !== school.id);
+                                      setFormData({...formData, allowed_schools: updatedList});
+                                    }}
+                                    style={{ accentColor: '#f59e0b', cursor: 'pointer' }}
+                                  />
+                                  <span>{school.name}</span>
+                                </label>
+                              );
+                            });
+                          })()
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>Selected: {formData.allowed_schools.length} school(s)</span>
+                        {formData.allowed_schools.length > 0 && (
+                          <button 
+                            type="button" 
+                            onClick={() => setFormData({...formData, allowed_schools: []})}
+                            style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontSize: 11, padding: 0 }}
+                          >
+                            Clear all
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>

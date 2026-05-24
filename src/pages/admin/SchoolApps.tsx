@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '../../components/AdminLayout';
-import { Package, Download, CheckCircle2, Play, Pause, Trash2, Loader2, Search } from 'lucide-react';
+import { Package, Download, CheckCircle2, Play, Pause, Trash2, Loader2, Search, Sparkles } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { motion } from 'framer-motion';
 
@@ -179,6 +179,11 @@ export default function SchoolApps() {
                     <div style={{ position: 'absolute', top: 12, right: 12, padding: '4px 10px', background: isActive ? '#34d399' : '#94a3b8', borderRadius: 20, color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                       {isActive ? <CheckCircle2 size={12} /> : null}
                       {isActive ? 'ACTIVE' : 'INSTALLED'}
+                    </div>
+                  )}
+                  {app.published_scope === 'specific' && (
+                    <div style={{ position: 'absolute', top: 12, left: 12, padding: '4px 10px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', borderRadius: 20, color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4, boxShadow: '0 2px 4px rgba(0,0,0,0.1)', letterSpacing: '0.5px' }}>
+                      <Sparkles size={10} style={{ strokeWidth: 3 }} /> EXCLUSIVE
                     </div>
                   )}
                 </div>

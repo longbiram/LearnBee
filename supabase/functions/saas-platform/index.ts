@@ -565,8 +565,11 @@ Deno.serve(async (req) => {
     // ── marketplace ────────────────────────────────────────────
     if (pathname.includes('marketplace')) {
       if (req.method === 'GET') {
-        const { data: modules } = await supabaseAdmin.from('marketplace_modules').select('*').order('created_at', { ascending: false });
-        return new Response(JSON.stringify({ modules }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        const [modulesResult, schoolsResult] = await Promise.all([
+          supabaseAdmin.from('marketplace_modules').select('*').order('created_at', { ascending: false }),
+          supabaseAdmin.from('schools').select('id, name').order('name', { ascending: true })
+        ]);
+        return new Response(JSON.stringify({ modules: modulesResult.data, schools: schoolsResult.data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       if (!isSuperAdmin) return new Response('Unauthorized', { status: 401, headers: corsHeaders });
       if (req.method === 'POST') {
@@ -637,15 +640,32 @@ Deno.serve(async (req) => {
       const { data: profile } = await supabaseAdmin.from('profiles').select('school_id, role').eq('id', user.id).single();
       if (!profile?.school_id) return new Response('Unauthorized: School context missing', { status: 401, headers: corsHeaders });
       if (req.method === 'GET') {
-        const [marketplace, installed] = await Promise.all([
+        const [marketplaceResult, installed] = await Promise.all([
           supabaseAdmin.from('marketplace_modules').select('*').eq('is_active', true),
           supabaseAdmin.from('school_modules').select('*').eq('school_id', profile.school_id),
         ]);
-        return new Response(JSON.stringify({ marketplace: marketplace.data, installed: installed.data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        const filteredMarketplace = (marketplaceResult.data || []).filter((module: any) => {
+          if (module.published_scope === 'specific') {
+            return Array.isArray(module.allowed_schools) && module.allowed_schools.includes(profile.school_id);
+          }
+          return true;
+        });
+        return new Response(JSON.stringify({ marketplace: filteredMarketplace, installed: installed.data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       if (req.method === 'POST') {
         const { module_id, action } = await req.json();
         if (action === 'install') {
+          // Security Check: Verify that this school is allowed to install this module
+          const { data: targetModule } = await supabaseAdmin.from('marketplace_modules').select('published_scope, allowed_schools').eq('id', module_id).single();
+          if (!targetModule) {
+            return new Response(JSON.stringify({ error: 'Module not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+          if (targetModule.published_scope === 'specific') {
+            const allowed = Array.isArray(targetModule.allowed_schools) && targetModule.allowed_schools.includes(profile.school_id);
+            if (!allowed) {
+              return new Response(JSON.stringify({ error: 'Unauthorized: This school is not permitted to install this exclusive module.' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+          }
           const { data, error } = await supabaseAdmin.from('school_modules').upsert({ school_id: profile.school_id, module_id, is_active: true, installed_at: new Date() }).select().single();
           if (error) throw error;
           return new Response(JSON.stringify({ data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

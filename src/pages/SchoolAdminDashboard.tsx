@@ -9,11 +9,12 @@ import {
   DollarSign, CalendarDays, Bell, MessageSquare, Settings, LogOut,
   Search, ChevronDown, ChevronRight, TrendingUp,
   Menu, X, Clock, BarChart2, Package, Banknote, ShoppingBag,
-  User, Mail, Shield
+  User, Mail, Shield, FileText
 } from 'lucide-react';
 import learnBeeLogo from '../assets/learnbeelogo.png';
 import UpgradeStaffModal from '../components/UpgradeStaffModal';
 import SubscriptionModal from '../components/SubscriptionModal';
+import { supabase } from '../lib/supabase';
 
 /* ─── Types ─────────────────────────────────────── */
 interface NavItem {
@@ -92,9 +93,56 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import { getAttendance } from '../hooks/useErpAttendance';
 
 export default function SchoolAdminDashboard() {
+  const { schoolId, profile, user, signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024);
   const [openNav, setOpenNav] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  const [installedApps, setInstalledApps] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!schoolId) return;
+    const fetchInstalled = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('school_modules')
+          .select('is_active, marketplace_modules(*)')
+          .eq('school_id', schoolId)
+          .eq('is_active', true);
+        
+        if (!error && data) {
+          const apps = data
+            .map((row: any) => row.marketplace_modules)
+            .filter(Boolean);
+          setInstalledApps(apps);
+        }
+      } catch (err) {
+        console.error('Error fetching dynamic sidebar modules:', err);
+      }
+    };
+
+    fetchInstalled();
+
+    // Set up Realtime listener to immediately update sidebar across all screens when an app is installed/toggled
+    const channel = supabase
+      .channel('school_modules_dashboard_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'school_modules',
+          filter: `school_id=eq.${schoolId}`
+        },
+        () => {
+          fetchInstalled();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [schoolId]);
 
   useEffect(() => {
     const onResize = () => {
@@ -110,7 +158,6 @@ export default function SchoolAdminDashboard() {
   // Upgrade staff modals state
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
-  const { schoolId, profile, user, signOut } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -282,6 +329,37 @@ export default function SchoolAdminDashboard() {
   const toggleNav = (label: string) =>
     setOpenNav(prev => (prev === label ? null : label));
 
+  // Dynamic navigation items for dynamic sidebar modules
+  const finalNavItems = useMemo(() => {
+    let items = [...navItems];
+    
+    if (installedApps.length > 0) {
+      const appsIndex = items.findIndex(item => item.label === 'Apps');
+      const customItems = installedApps.map(app => {
+        let IconComponent = Package;
+        if (app.slug?.includes('visitor')) {
+          IconComponent = UserCheck;
+        } else if (app.slug?.includes('report') || app.slug?.includes('card')) {
+          IconComponent = FileText;
+        }
+
+        return {
+          icon: IconComponent,
+          label: app.name,
+          to: `/school-admin/apps/${app.slug}`
+        };
+      });
+
+      if (appsIndex !== -1) {
+        items.splice(appsIndex, 0, ...customItems);
+      } else {
+        items.push(...customItems);
+      }
+    }
+    
+    return items;
+  }, [installedApps]);
+
   /* ── sidebar ──────────────────────────────────────── */
   const Sidebar = (
     <aside
@@ -313,7 +391,7 @@ export default function SchoolAdminDashboard() {
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '12px 10px' }}>
-        {navItems.map(item => {
+        {finalNavItems.map(item => {
           const Icon = item.icon;
           const isOpen = openNav === item.label;
           if (item.children) {
@@ -697,6 +775,36 @@ export default function SchoolAdminDashboard() {
               </div>
             ))}
           </div>
+
+          {/* ── Active ERP Modules ─────────────────── */}
+          {installedApps.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>🔌</span> Installed Marketplace Apps
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(285px, 1fr))', gap: 18 }}>
+                {installedApps.map((app: any) => {
+                  return (
+                    <motion.div
+                      key={app.id}
+                      whileHover={{ y: -4, boxShadow: '0 12px 20px rgba(0, 0, 0, 0.05)' }}
+                      onClick={() => navigate(`/school-admin/apps/${app.slug}`)}
+                      style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', padding: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16, transition: 'all 0.2s' }}
+                    >
+                      <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg, #ede9fe, #ddd6fe)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
+                        {app.slug?.includes('visitor') ? '🎫' : '📦'}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{app.name}</h4>
+                        <p style={{ margin: '3px 0 0', fontSize: 12, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.description}</p>
+                      </div>
+                      <div style={{ padding: '4px 8px', background: '#f0fdf4', color: '#16a34a', borderRadius: 8, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>ACTIVE</div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* ── Inventory Quick Stats ────────────────── */}
           {invStats && (

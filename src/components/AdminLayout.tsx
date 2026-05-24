@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, BookOpen, UserCheck,
   DollarSign, CalendarDays, Bell, MessageSquare, Settings, LogOut,
   Search, ChevronDown, ChevronRight, Menu, X, BarChart2, Package, Banknote,
-  User, Mail, Shield, ShoppingBag
+  User, Mail, Shield, ShoppingBag, FileText
 } from 'lucide-react';
 import SubscriptionModal from './SubscriptionModal';
 import UpgradeStaffModal from './UpgradeStaffModal';
@@ -82,6 +82,52 @@ export default function AdminLayout({ children, pageTitle, pageSubtitle }: {
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024);
+  const [installedApps, setInstalledApps] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!schoolId) return;
+    const fetchInstalled = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('school_modules')
+          .select('is_active, marketplace_modules(*)')
+          .eq('school_id', schoolId)
+          .eq('is_active', true);
+        
+        if (!error && data) {
+          const apps = data
+            .map((row: any) => row.marketplace_modules)
+            .filter(Boolean);
+          setInstalledApps(apps);
+        }
+      } catch (err) {
+        console.error('Error fetching dynamic sidebar modules:', err);
+      }
+    };
+
+    fetchInstalled();
+
+    // Set up Realtime listener to immediately update sidebar across all screens when an app is installed/toggled
+    const channel = supabase
+      .channel('school_modules_sidebar_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'school_modules',
+          filter: `school_id=eq.${schoolId}`
+        },
+        () => {
+          fetchInstalled();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [schoolId]);
 
   useEffect(() => {
     const onResize = () => {
@@ -209,15 +255,45 @@ export default function AdminLayout({ children, pageTitle, pageSubtitle }: {
     if (searchOpen) setTimeout(() => searchRef.current?.focus(), 50);
   }, [searchOpen]);
   
-  // Role-based navigation filtering
+  // Role-based navigation filtering and dynamic installed apps addition
   const finalNavItems = useMemo(() => {
-    let items = navItems;
+    let items = [...navItems];
+    
+    // Clerk role filtering
     if (profile?.role === 'clerk') {
       items = items.filter(item => ['Dashboard', 'Students', 'Attendance', 'Routine', 'Notice', 'Apps'].includes(item.label));
       items = items.map(item => item.label === 'Dashboard' ? { ...item, to: '/clerk' } : item);
     }
+
+    // Dynamic Installed Modules Addition (for school admins / clerks)
+    if (installedApps.length > 0) {
+      const appsIndex = items.findIndex(item => item.label === 'Apps');
+      const customItems = installedApps.map(app => {
+        // Icon mapping based on slug
+        let IconComponent = Package;
+        if (app.slug?.includes('visitor')) {
+          IconComponent = UserCheck;
+        } else if (app.slug?.includes('report') || app.slug?.includes('card')) {
+          IconComponent = FileText;
+        }
+
+        return {
+          icon: IconComponent,
+          label: app.name,
+          to: `/school-admin/apps/${app.slug}`
+        };
+      });
+
+      if (appsIndex !== -1) {
+        // Insert custom apps right before "Apps" menu item
+        items.splice(appsIndex, 0, ...customItems);
+      } else {
+        items.push(...customItems);
+      }
+    }
+    
     return items;
-  }, [profile?.role]);
+  }, [profile?.role, installedApps]);
 
   const getFilteredParentLabel = (path: string) => {
     for (const item of finalNavItems) {
@@ -687,10 +763,12 @@ export default function AdminLayout({ children, pageTitle, pageSubtitle }: {
 
           {/* Page content */}
           <main className="dashboard-main-content" style={{ flex: 1, padding: isMobile ? '16px' : '28px', overflowY: 'auto', minWidth: 0 }}>
-            <div style={{ marginBottom: 22 }}>
-              <h1 style={{ fontSize: isMobile ? 18 : 20, fontWeight: 800, color: '#1e293b', margin: 0 }}>{pageTitle}</h1>
-              {pageSubtitle && <p style={{ fontSize: isMobile ? 12 : 13, color: '#94a3b8', margin: '4px 0 0' }}>{pageSubtitle}</p>}
-            </div>
+            {pageTitle && (
+              <div style={{ marginBottom: 22 }}>
+                <h1 style={{ fontSize: isMobile ? 18 : 20, fontWeight: 800, color: '#1e293b', margin: 0 }}>{pageTitle}</h1>
+                {pageSubtitle && <p style={{ fontSize: isMobile ? 12 : 13, color: '#94a3b8', margin: '4px 0 0' }}>{pageSubtitle}</p>}
+              </div>
+            )}
             {children}
           </main>
         </div>

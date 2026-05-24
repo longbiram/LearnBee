@@ -304,14 +304,43 @@ function AcademicYearTab({ schoolId }: { schoolId: string }) {
 
       {/* Year Change Checklist Modal */}
       {showYearChangeModal && pendingSession && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
-          <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 520, boxShadow: '0 24px 80px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
-            <div style={{ background: 'linear-gradient(135deg,#7c3aed,#4F8EF7)', padding: '24px 28px' }}>
+        <div className="session-modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
+          <style dangerouslySetInnerHTML={{ __html: `
+            .session-modal-overlay {
+              padding: 20px !important;
+            }
+            @media (max-width: 500px) {
+              .session-modal-overlay {
+                padding: 12px !important;
+              }
+              .session-modal-card {
+                border-radius: 16px !important;
+                max-height: calc(100svh - 24px) !important;
+              }
+              .session-modal-header {
+                padding: 20px 20px !important;
+              }
+              .session-modal-body {
+                padding: 16px 20px !important;
+              }
+              .session-modal-footer {
+                padding: 12px 20px 16px !important;
+                flex-direction: column-reverse !important;
+                gap: 8px !important;
+              }
+              .session-modal-btn {
+                width: 100% !important;
+                justify-content: center !important;
+              }
+            }
+          `}} />
+          <div className="session-modal-card" style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 520, maxHeight: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+            <div className="session-modal-header" style={{ background: 'linear-gradient(135deg,#7c3aed,#4F8EF7)', padding: '24px 28px', flexShrink: 0 }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>📅</div>
               <h2 style={{ margin: 0, fontSize: 20, color: '#fff', fontWeight: 800 }}>Switch to {pendingSession.name}?</h2>
               <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>Please review the checklist below before switching academic years.</p>
             </div>
-            <div style={{ padding: '20px 28px' }}>
+            <div className="session-modal-body" style={{ padding: '20px 28px', overflowY: 'auto', flex: 1 }}>
               <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Year-End Checklist</p>
               {[
                 { 
@@ -353,12 +382,14 @@ function AcademicYearTab({ schoolId }: { schoolId: string }) {
                 <p style={{ margin: 0, fontSize: 12, color: '#991b1b', lineHeight: 1.5 }}>After switching, ALL new operations (Attendance, Fees, Exams) will use <strong>{pendingSession.name}</strong> as the default.</p>
               </div>
             </div>
-            <div style={{ padding: '16px 28px 24px', display: 'flex', gap: 12, justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9' }}>
+            <div className="session-modal-footer" style={{ padding: '16px 28px 24px', display: 'flex', gap: 12, justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', flexShrink: 0, flexWrap: 'wrap' }}>
               <button
+                className="session-modal-btn"
                 onClick={() => { setShowYearChangeModal(false); setPendingSession(null); }}
                 style={{ padding: '10px 20px', background: '#f1f5f9', color: '#475569', borderRadius: 10, border: 'none', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
               >Cancel</button>
               <button
+                className="session-modal-btn"
                 onClick={confirmSetCurrent}
                 style={{ padding: '10px 24px', background: '#7c3aed', color: '#fff', borderRadius: 10, border: 'none', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
               >

@@ -64,6 +64,7 @@ import Inventory from './pages/admin/Inventory';
 import Payroll from './pages/admin/Payroll';
 import ClassTeachers from './pages/admin/ClassTeachers';
 import SchoolApps from './pages/admin/SchoolApps';
+import SchoolAppRunner from './pages/admin/SchoolAppRunner';
 
 // Super Admin
 import SuperAdminDashboard from './pages/super-admin/SuperAdminDashboard';
@@ -140,6 +141,7 @@ function App() {
         <Route path="/school-admin/inventory" element={<Inventory />} />
         <Route path="/school-admin/payroll" element={<Payroll />} />
         <Route path="/school-admin/apps" element={<SchoolApps />} />
+        <Route path="/school-admin/apps/:slug" element={<SchoolAppRunner />} />
         <Route path="/school-admin/class-teachers" element={<ClassTeachers />} />
 
         {/* Super Admin */}
