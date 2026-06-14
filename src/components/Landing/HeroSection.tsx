@@ -207,7 +207,7 @@ export default function HeroSection() {
           <motion.button
             whileHover={{ scale:1.04, borderColor:'rgba(255,255,255,0.3)', background:'rgba(255,255,255,0.08)' }}
             whileTap={{ scale:0.97 }}
-            onClick={() => navigate('/watch-demo')}
+            onClick={() => navigate('/guide')}
             style={{
               background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.12)',
               color:'rgba(255,255,255,0.85)', fontSize: isMobile ? 14 : 16, fontWeight:600,
@@ -216,7 +216,7 @@ export default function HeroSection() {
               backdropFilter:'blur(10px)', transition:'all 0.25s',
             }}
           >
-            <Play size={isMobile ? 15 : 17} fill="currentColor" /> Watch Demo
+            <BookOpen size={isMobile ? 15 : 17} fill="currentColor" /> Guide
           </motion.button>
         </motion.div>
 

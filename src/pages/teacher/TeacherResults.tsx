@@ -14,7 +14,7 @@ const markInput: React.CSSProperties = { padding: '6px 8px', border: '1px solid 
 
 export default function TeacherResults() {
   const { schoolId, profile } = useAuth();
-  
+
   const { currentSession } = useErpClasses(schoolId);
   const { exams, loading: examsLoading } = useExams(schoolId, currentSession?.id);
   const publishedExams = exams.filter((e: any) => e.status === 'published' || e.status === 'locked');
@@ -43,15 +43,15 @@ export default function TeacherResults() {
 
   const isClassTeacher = useMemo(() => {
     if (!myStaffId || !selectedExam) return false;
-    return classTeachers.some(ct => 
-      ct.teacher_id === myStaffId && 
-      ct.class_id === selectedExam.class_id && 
+    return classTeachers.some(ct =>
+      ct.teacher_id === myStaffId &&
+      ct.class_id === selectedExam.class_id &&
       (!ct.section || ct.section === selectedExam.section)
     );
   }, [myStaffId, selectedExam, classTeachers]);
 
   const [resultOverrides, setResultOverrides] = useState<Record<string, { remarks: string, result: string }>>({});
-  
+
   useEffect(() => {
     if (!schoolId || !selectedExamId) return;
     getExamStudentResults(schoolId, selectedExamId).then(res => {
@@ -120,14 +120,14 @@ export default function TeacherResults() {
           }
         });
       });
-      
+
       let marksSaved = false;
       if (marksData.length > 0) {
         await upsertMarks({ school_id: schoolId, exam_id: selectedExamId, marks_data: marksData });
         await refetchMarks();
         marksSaved = true;
       }
-      
+
       let overridesSaved = false;
       const resultPromises = classStudents.map((st: any) => {
         const ov = resultOverrides[st.id] || { remarks: '', result: '' };
@@ -244,18 +244,18 @@ export default function TeacherResults() {
                       const isAbsent = ed.absent;
                       const isLocked = selectedExam.status === 'locked';
                       const isOtherUser = ed.entered_by && ed.entered_by !== profile?.id && ed.entered_by !== myStaffId;
-                      
+
                       return (
                         <td key={sub.subject_id} style={{ ...tdStyle, padding: '8px 12px' }}>
                           {isAbsent ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                               <span style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>Absent</span>
-                               {isOtherUser && ed.entered_by_name && (
+                              <span style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>Absent</span>
+                              {isOtherUser && ed.entered_by_name && (
                                 <div style={{ fontSize: 9, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 4 }}>
                                   <div style={{ width: 4, height: 4, borderRadius: '50%', background: ed.entered_by_role === 'admin' ? '#ef4444' : '#3b82f6' }} />
                                   By: {ed.entered_by_name}
                                 </div>
-                               )}
+                              )}
                             </div>
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -297,31 +297,31 @@ export default function TeacherResults() {
                     })}
                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                       {(() => {
-                          const firstSubId = selectedExam.subjects_config[0]?.subject_id ?? '';
-                          const ed = getEdit(st.id, firstSubId);
-                          return (
-                              <input type="checkbox"
-                                checked={ed.absent || false}
-                                disabled={selectedExam.status === 'locked'}
-                                onChange={e => {
-                                  selectedExam.subjects_config.forEach((sub: any) =>
-                                    setEdit(st.id, sub.subject_id, 'absent', e.target.checked)
-                                  );
-                                }}
-                                style={{ accentColor: '#dc2626', width: 16, height: 16, cursor: 'pointer' }}
-                              />
-                          );
+                        const firstSubId = selectedExam.subjects_config[0]?.subject_id ?? '';
+                        const ed = getEdit(st.id, firstSubId);
+                        return (
+                          <input type="checkbox"
+                            checked={ed.absent || false}
+                            disabled={selectedExam.status === 'locked'}
+                            onChange={e => {
+                              selectedExam.subjects_config.forEach((sub: any) =>
+                                setEdit(st.id, sub.subject_id, 'absent', e.target.checked)
+                              );
+                            }}
+                            style={{ accentColor: '#dc2626', width: 16, height: 16, cursor: 'pointer' }}
+                          />
+                        );
                       })()}
                     </td>
                     <>
                       {/* Remarks */}
                       <td style={{ ...tdStyle, padding: '8px 12px' }}>
-                        <input 
+                        <input
                           value={resultOverrides[st.id]?.remarks ?? ''}
                           onChange={e => setResultOverrides(prev => ({ ...prev, [st.id]: { ...prev[st.id], remarks: e.target.value } }))}
-                          placeholder="Add remarks…"
-                          disabled={selectedExam.status === 'locked'}
-                          style={{ ...markInput, width: 130, fontSize: 11, padding: '5px 8px' }}
+                          placeholder={isClassTeacher ? "Add remarks…" : "Class Teacher only"}
+                          disabled={selectedExam.status === 'locked' || !isClassTeacher}
+                          style={{ ...markInput, width: 130, fontSize: 11, padding: '5px 8px', background: (!isClassTeacher || selectedExam.status === 'locked') ? '#f1f5f9' : '#fff' }}
                         />
                       </td>
                       {/* Result */}
@@ -329,8 +329,8 @@ export default function TeacherResults() {
                         <select
                           value={resultOverrides[st.id]?.result ?? ''}
                           onChange={e => setResultOverrides(prev => ({ ...prev, [st.id]: { ...prev[st.id], result: e.target.value } }))}
-                          disabled={selectedExam.status === 'locked'}
-                          style={{ ...markInput, width: 130, fontSize: 11, padding: '5px 8px', cursor: 'pointer' }}
+                          disabled={selectedExam.status === 'locked' || !isClassTeacher}
+                          style={{ ...markInput, width: 130, fontSize: 11, padding: '5px 8px', cursor: (!isClassTeacher || selectedExam.status === 'locked') ? 'not-allowed' : 'pointer', background: (!isClassTeacher || selectedExam.status === 'locked') ? '#f1f5f9' : '#fff' }}
                         >
                           <option value="">Auto-detect</option>
                           <option value="PASS">PASS</option>

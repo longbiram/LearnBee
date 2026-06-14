@@ -3,7 +3,7 @@ import './index.css';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
-import WatchDemo from './pages/WatchDemo';
+import Guide from './pages/Guide';
 import ScheduleDemo from './pages/ScheduleDemo';
 import FeatureDetail from './pages/FeatureDetail';
 import ResetPassword from './pages/ResetPassword';
@@ -83,7 +83,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/watch-demo" element={<WatchDemo />} />
+        <Route path="/guide" element={<Guide />} />
         <Route path="/schedule-demo" element={<ScheduleDemo />} />
         <Route path="/features/:featureId" element={<FeatureDetail />} />
         <Route path="/about" element={<About />} />
