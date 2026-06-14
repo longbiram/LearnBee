@@ -9,11 +9,12 @@ import {
   DollarSign, CalendarDays, Bell, MessageSquare, Settings, LogOut,
   Search, ChevronDown, ChevronRight, TrendingUp,
   Menu, X, Clock, BarChart2, Package, Banknote, ShoppingBag,
-  User, Mail, Shield, FileText
+  User, Mail, Shield, FileText, Loader2
 } from 'lucide-react';
 import learnBeeLogo from '../assets/learnbeelogo.png';
 import UpgradeStaffModal from '../components/UpgradeStaffModal';
 import SubscriptionModal from '../components/SubscriptionModal';
+import InvoiceModal from '../components/InvoiceModal';
 import { supabase } from '../lib/supabase';
 
 /* ─── Types ─────────────────────────────────────── */
@@ -158,6 +159,15 @@ export default function SchoolAdminDashboard() {
   // Upgrade staff modals state
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
+  
+  // Billing history state
+  const [showBillingHistoryModal, setShowBillingHistoryModal] = useState(false);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [selectedPaymentForInvoice, setSelectedPaymentForInvoice] = useState<any>(null);
+  const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
+  const [schoolData, setSchoolData] = useState<any>(null);
+  
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -236,11 +246,68 @@ export default function SchoolAdminDashboard() {
     if (searchOpen) setTimeout(() => searchRef.current?.focus(), 50);
   }, [searchOpen]);
 
+  // Fetch billing history from edge function
+  const fetchBillingHistory = useCallback(async () => {
+    if (!schoolId) return;
+    setPaymentsLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Fetch fresh school details directly from database to bypass RLS limits or old caches
+      const schoolRes = await supabase.from('schools').select('*').eq('id', schoolId).maybeSingle();
+      if (schoolRes.data) {
+        setSchoolData(schoolRes.data);
+      }
+
+      if (session?.access_token) {
+        const SUPABASE_URL_LOCAL = import.meta.env.VITE_SUPABASE_URL as string;
+        const ANON_KEY_LOCAL     = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+        const res = await fetch(
+          `${SUPABASE_URL_LOCAL}/functions/v1/saas-platform/school-subscriptions?school_id=${schoolId}`,
+          { headers: { apikey: ANON_KEY_LOCAL, Authorization: `Bearer ${session.access_token}` } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setPayments(data.subscriptions ?? []);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching billing history:', err);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }, [schoolId]);
+
+  useEffect(() => {
+    if (showBillingHistoryModal) {
+      fetchBillingHistory();
+    }
+  }, [showBillingHistoryModal, fetchBillingHistory]);
+
   // Live data via Edge Functions (no direct DB access)
   const { students } = useStudents(schoolId);
   const { classes, currentSession } = useErpClasses(schoolId);
   const { staff } = useErpStaff(schoolId);
   const { school } = useSchoolInfo(schoolId);
+
+  // ── Plan student limit ───────────────────────────
+  const [planMaxStudents, setPlanMaxStudents] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!school?.subscription_plan) return;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('subscription_plans')
+          .select('max_students')
+          .eq('slug', school.subscription_plan!)
+          .single();
+        setPlanMaxStudents(data?.max_students ?? null);
+      } catch {
+        setPlanMaxStudents(null);
+      }
+    })();
+  }, [school?.subscription_plan]);
 
   const [dbNotices, setDbNotices] = useState<any[]>([]);
   const [feeData, setFeeData] = useState<any[]>([]);
@@ -319,11 +386,21 @@ export default function SchoolAdminDashboard() {
   const teacherCount = staff.filter(s => s.role === 'teacher').length;
   const staffCount   = staff.filter(s => s.role !== 'teacher').length;
 
+  // Derived student limit helpers for the dashboard
+  const studentLimitPct = planMaxStudents ? Math.min(100, Math.round((students.length / planMaxStudents) * 100)) : null;
+  const studentLimitColor = studentLimitPct !== null && studentLimitPct >= 100 ? '#dc2626' : studentLimitPct !== null && studentLimitPct >= 80 ? '#f59e0b' : '#38bdf8';
+
   const statCards = [
-    { label: 'Students', value: students.length.toLocaleString(), icon: '🎒', gradient: 'linear-gradient(135deg,#e0f2fe,#bae6fd)', iconBg: '#38bdf8', trend: 'Live count' },
-    { label: 'Teachers', value: teacherCount.toLocaleString(),    icon: '📚', gradient: 'linear-gradient(135deg,#fef3c7,#fde68a)', iconBg: '#f59e0b', trend: 'Live count' },
-    { label: 'Staffs',   value: staffCount.toLocaleString(),       icon: '🏢', gradient: 'linear-gradient(135deg,#ede9fe,#ddd6fe)', iconBg: '#7c3aed', trend: 'Live count' },
-    { label: 'Classes',  value: classes.length.toLocaleString(),  icon: '🏫', gradient: 'linear-gradient(135deg,#dcfce7,#bbf7d0)', iconBg: '#22c55e', trend: 'Live count' },
+    {
+      label: 'Students', value: students.length.toLocaleString(), icon: '🎒',
+      gradient: 'linear-gradient(135deg,#e0f2fe,#bae6fd)', iconBg: '#38bdf8',
+      trend: planMaxStudents ? `${students.length} / ${planMaxStudents.toLocaleString()} max` : 'Live count',
+      limitPct: studentLimitPct,
+      limitColor: studentLimitColor,
+    },
+    { label: 'Teachers', value: teacherCount.toLocaleString(), icon: '📚', gradient: 'linear-gradient(135deg,#fef3c7,#fde68a)', iconBg: '#f59e0b', trend: 'Live count', limitPct: null, limitColor: null },
+    { label: 'Staffs',   value: staffCount.toLocaleString(),   icon: '🏢', gradient: 'linear-gradient(135deg,#ede9fe,#ddd6fe)', iconBg: '#7c3aed', trend: 'Live count', limitPct: null, limitColor: null },
+    { label: 'Classes',  value: classes.length.toLocaleString(), icon: '🏫', gradient: 'linear-gradient(135deg,#dcfce7,#bbf7d0)', iconBg: '#22c55e', trend: 'Live count', limitPct: null, limitColor: null },
   ];
 
   const toggleNav = (label: string) =>
@@ -356,9 +433,28 @@ export default function SchoolAdminDashboard() {
         items.push(...customItems);
       }
     }
-    
     return items;
   }, [installedApps]);
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    const results: { label: string; to: string; icon: any }[] = [];
+    
+    finalNavItems.forEach(item => {
+      if (item.to && item.label.toLowerCase().includes(q)) {
+        results.push({ label: item.label, to: item.to, icon: item.icon });
+      }
+      if (item.children) {
+        item.children.forEach(child => {
+          if (child.label.toLowerCase().includes(q) || item.label.toLowerCase().includes(q)) {
+            results.push({ label: `${item.label} > ${child.label}`, to: child.to, icon: item.icon });
+          }
+        });
+      }
+    });
+    return results;
+  }, [searchQuery, finalNavItems]);
 
   /* ── sidebar ──────────────────────────────────────── */
   const Sidebar = (
@@ -521,42 +617,73 @@ export default function SchoolAdminDashboard() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {/* ── Search ── */}
-              <AnimatePresence mode="wait">
-                {searchOpen ? (
-                  <motion.div
-                    key="search-open"
-                    initial={{ width: 0, opacity: 0 }}
-                    animate={{ width: 220, opacity: 1 }}
-                    exit={{ width: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: 10, padding: '0 12px', height: 38, overflow: 'hidden' }}
-                  >
-                    <Search size={14} color="#94a3b8" style={{ flexShrink: 0 }} />
-                    <input
-                      ref={searchRef}
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      placeholder="Search..."
-                      style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: 13, color: '#1e293b', fontFamily: 'inherit', padding: '0 8px' }}
-                    />
-                    <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 0 }}>
-                      <X size={14} color="#94a3b8" />
-                    </button>
-                  </motion.div>
-                ) : (
-                  <motion.button
-                    key="search-closed"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    onClick={() => setSearchOpen(true)}
-                    style={{ width: 38, height: 38, borderRadius: 10, background: '#f1f5f9', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
-                    onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
-                  >
-                    <Search size={17} color="#64748b" />
-                  </motion.button>
+              <div style={{ position: 'relative' }}>
+                <AnimatePresence mode="wait">
+                  {searchOpen ? (
+                    <motion.div
+                      key="search-open"
+                      initial={{ width: 0, opacity: 0 }}
+                      animate={{ width: 220, opacity: 1 }}
+                      exit={{ width: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      style={{ position: 'relative', display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: 10, padding: '0 12px', height: 38 }}
+                    >
+                      <Search size={14} color="#94a3b8" style={{ flexShrink: 0 }} />
+                      <input
+                        ref={searchRef}
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        placeholder="Search..."
+                        style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: 13, color: '#1e293b', fontFamily: 'inherit', padding: '0 8px', minWidth: 0 }}
+                      />
+                      <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 0 }}>
+                        <X size={14} color="#94a3b8" />
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.button
+                      key="search-closed"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      onClick={() => setSearchOpen(true)}
+                      style={{ width: 38, height: 38, borderRadius: 10, background: '#f1f5f9', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
+                    >
+                      <Search size={17} color="#64748b" />
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+
+                {/* Dropdown outside animated container to prevent clipping */}
+                {searchOpen && searchQuery.trim() && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 280, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 10px 40px rgba(0,0,0,0.12)', zIndex: 300, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: 300 }}>
+                    <div style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9', fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Search Results</div>
+                    <div style={{ overflowY: 'auto' }}>
+                      {searchResults.length === 0 ? (
+                        <div style={{ padding: '20px 14px', textAlign: 'center', fontSize: 13, color: '#64748b' }}>No matches found</div>
+                      ) : (
+                        searchResults.map((res, i) => {
+                          const Icon = res.icon;
+                          return (
+                            <Link
+                              key={i}
+                              to={res.to}
+                              onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid #f8fafc', textDecoration: 'none', color: '#1e293b', transition: 'background 0.15s' }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                              onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                            >
+                              <Icon size={16} color="#8B5CF6" style={{ flexShrink: 0 }} />
+                              <span style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{res.label}</span>
+                            </Link>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
                 )}
-              </AnimatePresence>
+              </div>
 
               {/* ── Notifications ── */}
               <div ref={notifRef} style={{ position: 'relative' }}>
@@ -768,9 +895,27 @@ export default function SchoolAdminDashboard() {
                   </div>
                   <span style={{ fontSize: 28 }}>{card.icon}</span>
                 </div>
+                {/* Limit progress bar – only for cards with a limitPct */}
+                {card.limitPct !== null && card.limitColor && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ height: 5, background: '#f1f5f9', borderRadius: 999, overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${card.limitPct}%`,
+                        background: card.limitPct >= 100
+                          ? 'linear-gradient(90deg,#f87171,#dc2626)'
+                          : card.limitPct >= 80
+                            ? 'linear-gradient(90deg,#fbbf24,#f59e0b)'
+                            : 'linear-gradient(90deg,#7dd3fc,#38bdf8)',
+                        borderRadius: 999,
+                        transition: 'width .6s ease',
+                      }} />
+                    </div>
+                  </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <TrendingUp size={13} color="#22c55e" />
-                  <span style={{ fontSize: 11, color: '#64748b' }}>{card.trend}</span>
+                  <TrendingUp size={13} color={card.limitColor ?? '#22c55e'} />
+                  <span style={{ fontSize: 11, color: card.limitColor ? card.limitColor : '#64748b', fontWeight: card.limitPct !== null ? 600 : 400 }}>{card.trend}</span>
                 </div>
               </div>
             ))}
@@ -1013,15 +1158,16 @@ export default function SchoolAdminDashboard() {
             <h3 style={{ fontSize: 14, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>Quick Actions</h3>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               {[
-                { label: '+ Add Student', bg: '#ede9fe', color: '#7c3aed', to: '/school-admin/students/add' },
-                { label: '+ Add Teacher', bg: '#dbeafe', color: '#2563eb', to: '/school-admin/teachers/add' },
-                { label: '📋 Print TC', bg: '#fef9c3', color: '#ca8a04', to: '/school-admin/students/transfer' },
-                { label: '💰 Collect Fee', bg: '#dcfce7', color: '#16a34a', to: '/school-admin/fees/school' },
-                { label: '📢 Post Notice', bg: '#fee2e2', color: '#dc2626', to: '/school-admin/notice' },
+                { label: '+ Add Student', bg: '#ede9fe', color: '#7c3aed', onClick: () => navigate('/school-admin/students/add') },
+                { label: '+ Add Teacher', bg: '#dbeafe', color: '#2563eb', onClick: () => navigate('/school-admin/teachers/add') },
+                { label: '📋 Print TC', bg: '#fef9c3', color: '#ca8a04', onClick: () => navigate('/school-admin/students/transfer') },
+                { label: '💰 Collect Fee', bg: '#dcfce7', color: '#16a34a', onClick: () => navigate('/school-admin/fees/school') },
+                { label: '📢 Post Notice', bg: '#fee2e2', color: '#dc2626', onClick: () => navigate('/school-admin/notice') },
+                { label: '🧾 Billing History', bg: '#eff6ff', color: '#2563eb', onClick: () => setShowBillingHistoryModal(true) },
               ].map(q => (
                 <button
                   key={q.label}
-                  onClick={() => navigate(q.to)}
+                  onClick={q.onClick}
                   style={{ padding: '10px 18px', background: q.bg, border: 'none', borderRadius: 10, fontSize: 13, color: q.color, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
                   onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(0.95)')}
                   onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
@@ -1060,6 +1206,112 @@ export default function SchoolAdminDashboard() {
         onClose={() => setShowPayModal(false)}
       />
     )}
+
+    {showBillingHistoryModal && (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: 20 }}>
+        <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 700, maxHeight: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', overflow: 'hidden' }}>
+          {/* Header */}
+          <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #7c3aed, #4f8ef7)' }}>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>🧾</span> Billing & Subscription History
+            </h3>
+            <button onClick={() => setShowBillingHistoryModal(false)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#fff' }}>
+              <X size={16} />
+            </button>
+          </div>
+          {/* Body */}
+          <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+            {paymentsLoading ? (
+              <div style={{ padding: 40, textAlign: 'center' }}>
+                <Loader2 style={{ animation: 'spin 1s linear infinite' }} size={24} color="#7c3aed" />
+              </div>
+            ) : payments.length === 0 ? (
+              <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+                No subscription payments recorded yet.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc' }}>
+                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #e2e8f0' }}>Plan</th>
+                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #e2e8f0' }}>Amount (₹)</th>
+                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #e2e8f0' }}>Paid On</th>
+                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #e2e8f0' }}>Status</th>
+                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #e2e8f0' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map(p => {
+                      const now = new Date();
+                      const isExpired = p.expires_at ? new Date(p.expires_at) < now : false;
+                      const isActive = p.status === 'active' && !isExpired;
+                      return (
+                        <tr key={p.id}>
+                          <td style={{ padding: '12px 16px', fontSize: 13, color: '#475569', borderBottom: '1px solid #f1f5f9', textTransform: 'capitalize', fontWeight: 600 }}>{p.plan}</td>
+                          <td style={{ padding: '12px 16px', fontSize: 13, color: '#0f172a', borderBottom: '1px solid #f1f5f9', fontWeight: 700 }}>₹{Number(p.amount).toLocaleString('en-IN')}</td>
+                          <td style={{ padding: '12px 16px', fontSize: 13, color: '#475569', borderBottom: '1px solid #f1f5f9' }}>
+                            {p.created_at ? new Date(p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: 13, color: '#475569', borderBottom: '1px solid #f1f5f9' }}>
+                            <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: isActive ? '#ecfdf5' : '#fef2f2', color: isActive ? '#059669' : '#dc2626' }}>
+                              {isActive ? 'Active' : 'Expired'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: 13, color: '#475569', borderBottom: '1px solid #f1f5f9' }}>
+                            <button
+                              onClick={() => {
+                                setSelectedPaymentForInvoice(p);
+                                setIsInvoiceOpen(true);
+                              }}
+                              style={{
+                                background: '#eff6ff',
+                                border: 'none',
+                                color: '#2563eb',
+                                borderRadius: 8,
+                                padding: '6px 12px',
+                                cursor: 'pointer',
+                                fontFamily: 'inherit',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#dbeafe'}
+                              onMouseLeave={e => e.currentTarget.style.background = '#eff6ff'}
+                            >
+                              <FileText size={13} /> Receipt
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          {/* Footer */}
+          <div style={{ padding: '14px 24px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', background: '#f8fafc' }}>
+            <button onClick={() => setShowBillingHistoryModal(false)} style={{ padding: '8px 20px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Close</button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {selectedPaymentForInvoice && (
+      <InvoiceModal
+        isOpen={isInvoiceOpen}
+        onClose={() => {
+          setIsInvoiceOpen(false);
+          setSelectedPaymentForInvoice(null);
+        }}
+        payment={selectedPaymentForInvoice}
+        school={schoolData || school}
+      />
+    )}
     </ProtectedRoute>
   );
 }
+

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import SuperAdminLayout from '../../components/layout/SuperAdminLayout';
 import { supabase } from '../../lib/supabase';
-import { Building2, Users, CreditCard, Activity, Ticket, CheckCircle, X, ExternalLink, Calendar, Newspaper } from 'lucide-react';
+import { Building2, Users, CreditCard, Activity, Ticket, CheckCircle, X, ExternalLink, Calendar, Newspaper, Bell, Send, Search, Loader2, History } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -83,6 +83,122 @@ export default function SuperAdminDashboard() {
   });
   const [pressCoverage, setPressCoverage] = useState<any[]>([]);
   const [loadingPress, setLoadingPress] = useState(false);
+
+  // ── Broadcast Notification state ────────────────────────────
+  const [showNotifModal, setShowNotifModal] = useState(false);
+  const [allSchools, setAllSchools] = useState<any[]>([]);
+  const [loadingSchools, setLoadingSchools] = useState(false);
+  const [notifForm, setNotifForm] = useState({
+    target: 'all' as 'all' | 'specific',
+    selectedSchools: [] as string[],
+    type: 'info' as 'info' | 'warning' | 'urgent',
+    title: '',
+    message: '',
+  });
+  const [notifSending, setNotifSending] = useState(false);
+  const [notifSuccess, setNotifSuccess] = useState(false);
+  const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
+  
+  // ── Notification History state ──────────────────────────────
+  const [showNotifHistoryModal, setShowNotifHistoryModal] = useState(false);
+  const [sentNotifications, setSentNotifications] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // ── Fetch all schools for notification target picker ────────
+  const fetchAllSchools = async () => {
+    setLoadingSchools(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/saas-platform/dashboard`, {
+        method: 'GET',
+        headers: {
+          'apikey': ANON_KEY,
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.recentSchools) {
+        // Fetch full list from schools table directly
+        const { data: schools, error } = await supabase
+          .from('schools')
+          .select('id, name, city, state, status')
+          .order('name', { ascending: true });
+        if (!error) setAllSchools(schools || []);
+      }
+    } catch (err) {
+      console.error('Error fetching schools for notification', err);
+    } finally {
+      setLoadingSchools(false);
+    }
+  };
+
+  const fetchNotificationHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from('erp_notifications')
+        .select('*, schools(name)')
+        .eq('target_role', 'school_admin')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSentNotifications(data || []);
+    } catch (err) {
+      console.error('Error fetching notification history', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // ── Send notification to school admin(s) ────────────────────
+  const handleSendNotification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notifForm.title.trim() || !notifForm.message.trim()) return;
+
+    setNotifSending(true);
+    try {
+      const targetSchools = notifForm.target === 'all'
+        ? allSchools.map(s => s.id)
+        : notifForm.selectedSchools;
+
+      if (targetSchools.length === 0) {
+        alert('Please select at least one school.');
+        setNotifSending(false);
+        return;
+      }
+
+      // Insert one notification row per school via supabase directly
+      const rows = targetSchools.map(schoolId => ({
+        school_id: schoolId,
+        target_role: 'school_admin',
+        type: notifForm.type,
+        title: notifForm.title.trim(),
+        message: notifForm.message.trim(),
+      }));
+
+      const { error } = await supabase
+        .from('erp_notifications')
+        .insert(rows);
+
+      if (error) throw error;
+
+      setNotifSuccess(true);
+      setNotifForm({ target: 'all', selectedSchools: [], type: 'info', title: '', message: '' });
+      // Update history if modal is open
+      if (showNotifHistoryModal) fetchNotificationHistory();
+      
+      setTimeout(() => {
+        setNotifSuccess(false);
+        setShowNotifModal(false);
+      }, 2000);
+    } catch (err: any) {
+      console.error('Error sending notification', err);
+      alert(err.message || 'Failed to send notification. Please try again.');
+    } finally {
+      setNotifSending(false);
+    }
+  };
 
   const handleViewAllTickets = async () => {
     setShowAllTicketsModal(true);
@@ -262,6 +378,7 @@ export default function SuperAdminDashboard() {
     fetchDashboardData();
     fetchApplications();
     fetchPressCoverage();
+    fetchAllSchools();
   }, []);
 
   const handleResolveTicket = async (ticketId: string) => {
@@ -662,6 +779,60 @@ export default function SuperAdminDashboard() {
         )}
       </div>
 
+      {/* ── Broadcast Notification Panel ────────────────── */}
+      <div style={{ marginTop: 24, background: 'linear-gradient(135deg, #1e1b4b 0%, #1e293b 100%)', border: '1px solid #4338ca', borderRadius: 16, padding: '24px', overflow: 'hidden', boxShadow: '0 0 30px rgba(99,102,241,0.08)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(99,102,241,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Bell size={20} color="#818cf8" />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>Broadcast Notification</h3>
+              <p style={{ margin: 0, fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Send announcements directly to School Admin dashboards</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={() => {
+                setShowNotifHistoryModal(true);
+                fetchNotificationHistory();
+              }}
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 16px', color: '#cbd5e1', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.15s' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+            >
+              <History size={14} /> History
+            </button>
+            <button
+              onClick={() => setShowNotifModal(true)}
+              style={{ background: 'linear-gradient(135deg, #6366f1, #818cf8)', border: 'none', borderRadius: 10, padding: '10px 20px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}
+            >
+              <Send size={14} /> Compose & Send
+            </button>
+          </div>
+        </div>
+
+        {/* Quick type badges */}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {[
+            { type: 'info', label: 'ℹ️ Informational', bg: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: 'rgba(59,130,246,0.2)' },
+            { type: 'warning', label: '⚠️ Warning', bg: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: 'rgba(245,158,11,0.2)' },
+            { type: 'urgent', label: '🚨 Urgent Alert', bg: 'rgba(239,68,68,0.12)', color: '#f87171', border: 'rgba(239,68,68,0.2)' },
+          ].map(b => (
+            <button
+              key={b.type}
+              onClick={() => { setNotifForm(f => ({ ...f, type: b.type as any })); setShowNotifModal(true); }}
+              style={{ padding: '6px 14px', borderRadius: 20, background: b.bg, border: `1px solid ${b.border}`, color: b.color, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            >
+              {b.label}
+            </button>
+          ))}
+          <span style={{ fontSize: 12, color: '#475569', alignSelf: 'center', marginLeft: 8 }}>
+            {allSchools.length} schools available
+          </span>
+        </div>
+      </div>
+
       {/* Blog Management */}
       <div style={{ marginTop: 24, background: '#1e293b', border: '1px solid #334155', borderRadius: 16, padding: '24px', overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -945,6 +1116,287 @@ export default function SuperAdminDashboard() {
             <div style={{ padding: '16px 24px', background: 'rgba(15,23,42,0.5)', borderTop: '1px solid rgba(148,163,184,0.1)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
               <button
                 onClick={() => setShowAllTicketsModal(false)}
+                style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, color: '#f8fafc', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}>
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── Broadcast Notification Modal ─────────────────── */}
+      {showNotifModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(3,7,18,0.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 24 }}>
+          <div style={{ width: '100%', maxWidth: 580, background: '#1e293b', border: '1px solid #334155', borderRadius: 20, boxShadow: '0 25px 60px -12px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden', animation: 'scaleUp 0.2s ease-out' }}>
+
+            {/* Header */}
+            <div style={{ background: 'linear-gradient(135deg, #1e1b4b, #1e293b)', padding: '20px 24px', borderBottom: '1px solid rgba(99,102,241,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(99,102,241,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Bell size={18} color="#818cf8" />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#f8fafc' }}>Compose Notification</h4>
+                  <p style={{ margin: 0, fontSize: 11, color: '#94a3b8' }}>Broadcast to School Admin notification bell</p>
+                </div>
+              </div>
+              <button onClick={() => setShowNotifModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            {notifSuccess ? (
+              <div style={{ padding: '48px 24px', textAlign: 'center' }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#34d399', marginBottom: 8 }}>Notification Sent!</div>
+                <div style={{ fontSize: 13, color: '#94a3b8' }}>School admins will see it in their notification bell.</div>
+              </div>
+            ) : (
+              <form onSubmit={handleSendNotification} style={{ padding: 24, overflowY: 'auto' }}>
+
+                {/* Target */}
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#cbd5e1', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Send To</label>
+                  <div style={{ display: 'flex', gap: 8, flexDirection: isMobile ? 'column' : 'row' }}>
+                    {(['all', 'specific'] as const).map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setNotifForm(f => ({ ...f, target: t, selectedSchools: [] }))}
+                        style={{
+                          flex: 1, padding: '10px', borderRadius: 10, border: '1px solid',
+                          borderColor: notifForm.target === t ? '#6366f1' : 'rgba(51,65,85,0.6)',
+                          background: notifForm.target === t ? 'rgba(99,102,241,0.15)' : 'rgba(15,23,42,0.3)',
+                          color: notifForm.target === t ? '#818cf8' : '#94a3b8',
+                          fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s'
+                        }}
+                      >
+                        {t === 'all' ? `🏫 All Schools (${allSchools.length})` : '🎯 Specific Schools'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* School Picker (only for specific) */}
+                {notifForm.target === 'specific' && (
+                  <div style={{ marginBottom: 18 }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#cbd5e1', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Select Schools
+                    </label>
+                    <div style={{ background: 'rgba(15,23,42,0.4)', border: '1px solid rgba(51,65,85,0.6)', borderRadius: 12, overflow: 'hidden' }}>
+                      {/* Search within picker */}
+                      <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(51,65,85,0.4)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Search size={13} color="#64748b" />
+                        <input
+                          type="text"
+                          placeholder="Search school..."
+                          value={schoolSearchQuery}
+                          onChange={e => setSchoolSearchQuery(e.target.value)}
+                          style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: '#f8fafc', fontSize: 13 }}
+                        />
+                      </div>
+                      <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+                        {loadingSchools ? (
+                          <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Loading schools...</div>
+                        ) : allSchools
+                            .filter(s => s.name.toLowerCase().includes(schoolSearchQuery.toLowerCase()))
+                            .map(school => {
+                              const isSelected = notifForm.selectedSchools.includes(school.id);
+                              return (
+                                <div
+                                  key={school.id}
+                                  onClick={() => setNotifForm(f => ({
+                                    ...f,
+                                    selectedSchools: isSelected
+                                      ? f.selectedSchools.filter(id => id !== school.id)
+                                      : [...f.selectedSchools, school.id]
+                                  }))}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer', background: isSelected ? 'rgba(99,102,241,0.1)' : 'transparent', borderBottom: '1px solid rgba(51,65,85,0.2)', transition: 'background 0.1s' }}
+                                >
+                                  <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${isSelected ? '#6366f1' : '#475569'}`, background: isSelected ? '#6366f1' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    {isSelected && <span style={{ color: '#fff', fontSize: 10, fontWeight: 800 }}>✓</span>}
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: '#f8fafc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{school.name}</div>
+                                    <div style={{ fontSize: 11, color: '#64748b' }}>{school.city || '—'}, {school.state || '—'}</div>
+                                  </div>
+                                  <div style={{ padding: '2px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600, background: school.status === 'active' ? 'rgba(52,211,153,0.12)' : 'rgba(239,68,68,0.12)', color: school.status === 'active' ? '#34d399' : '#ef4444' }}>
+                                    {school.status || 'inactive'}
+                                  </div>
+                                </div>
+                              );
+                            })
+                        }
+                      </div>
+                      {notifForm.selectedSchools.length > 0 && (
+                        <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(51,65,85,0.4)', fontSize: 12, color: '#818cf8', fontWeight: 600 }}>
+                          {notifForm.selectedSchools.length} school{notifForm.selectedSchools.length > 1 ? 's' : ''} selected
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Type */}
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#cbd5e1', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Notification Type</label>
+                  <div style={{ display: 'flex', gap: 8, flexDirection: isMobile ? 'column' : 'row' }}>
+                    {([
+                      { value: 'info', label: 'ℹ️ Info', activeColor: '#3b82f6' },
+                      { value: 'warning', label: '⚠️ Warning', activeColor: '#f59e0b' },
+                      { value: 'urgent', label: '🚨 Urgent', activeColor: '#ef4444' },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setNotifForm(f => ({ ...f, type: opt.value }))}
+                        style={{
+                          flex: 1, padding: '9px', borderRadius: 10, border: '1px solid',
+                          borderColor: notifForm.type === opt.value ? opt.activeColor : 'rgba(51,65,85,0.6)',
+                          background: notifForm.type === opt.value ? `${opt.activeColor}20` : 'rgba(15,23,42,0.3)',
+                          color: notifForm.type === opt.value ? opt.activeColor : '#94a3b8',
+                          fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s'
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#cbd5e1', marginBottom: 6 }}>Title *</label>
+                  <input
+                    type="text"
+                    value={notifForm.title}
+                    onChange={e => setNotifForm(f => ({ ...f, title: e.target.value }))}
+                    placeholder="e.g. Scheduled Maintenance on May 30"
+                    maxLength={100}
+                    required
+                    style={{ width: '100%', background: 'rgba(15,23,42,0.4)', border: '1px solid rgba(51,65,85,0.6)', borderRadius: 10, padding: '10px 14px', color: '#f8fafc', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                {/* Message */}
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#cbd5e1', marginBottom: 6 }}>Message *</label>
+                  <textarea
+                    value={notifForm.message}
+                    onChange={e => setNotifForm(f => ({ ...f, message: e.target.value }))}
+                    placeholder="Write your notification message here..."
+                    maxLength={500}
+                    required
+                    rows={4}
+                    style={{ width: '100%', background: 'rgba(15,23,42,0.4)', border: '1px solid rgba(51,65,85,0.6)', borderRadius: 10, padding: '10px 14px', color: '#f8fafc', fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                  />
+                  <div style={{ textAlign: 'right', fontSize: 11, color: '#475569', marginTop: 4 }}>{notifForm.message.length}/500</div>
+                </div>
+
+                {/* Preview */}
+                {notifForm.title && (
+                  <div style={{ marginBottom: 20, padding: '12px 14px', background: 'rgba(15,23,42,0.5)', borderRadius: 12, border: '1px solid rgba(51,65,85,0.4)' }}>
+                    <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Preview</div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>{notifForm.type === 'info' ? 'ℹ️' : notifForm.type === 'warning' ? '⚠️' : '🚨'}</span>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>{notifForm.title}</div>
+                        {notifForm.message && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 3, lineHeight: 1.4 }}>{notifForm.message}</div>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', justifyContent: 'flex-end', gap: 12 }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowNotifModal(false)}
+                    style={{ padding: '10px 18px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, color: '#f8fafc', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={notifSending || !notifForm.title.trim() || !notifForm.message.trim()}
+                    style={{ padding: '10px 22px', background: notifSending || !notifForm.title.trim() || !notifForm.message.trim() ? 'rgba(99,102,241,0.4)' : 'linear-gradient(135deg, #6366f1, #818cf8)', border: 'none', borderRadius: 10, color: '#fff', fontSize: 13, fontWeight: 700, cursor: notifSending ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}
+                  >
+                    {notifSending ? (
+                      <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Sending...</>
+                    ) : (
+                      <><Send size={14} /> Send Notification</>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Notification History Modal ─────────────────── */}
+      {showNotifHistoryModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(3,7,18,0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 24 }}>
+          <div style={{ width: '100%', maxWidth: 650, background: '#1e293b', border: '1px solid #334155', borderRadius: 20, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '85vh', animation: 'scaleUp 0.2s ease-out' }}>
+
+            {/* Header */}
+            <div style={{ background: 'linear-gradient(135deg,#0f172a,#1e293b)', padding: '20px 24px', borderBottom: '1px solid rgba(148,163,184,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(129,140,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <History size={18} color="#818cf8" />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>Notification History</h4>
+                  <p style={{ margin: 0, fontSize: 11, color: '#94a3b8' }}>Previously sent broadcast notifications</p>
+                </div>
+              </div>
+              <button onClick={() => setShowNotifHistoryModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: 24, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {loadingHistory ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#cbd5e1' }}>Loading history...</div>
+              ) : sentNotifications.length === 0 ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>No notifications sent yet.</div>
+              ) : (
+                sentNotifications.map(notif => (
+                  <div key={notif.id} style={{ padding: 16, background: 'rgba(15,23,42,0.4)', borderRadius: 12, border: '1px solid rgba(51,65,85,0.4)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 16 }}>{notif.type === 'info' ? 'ℹ️' : notif.type === 'warning' ? '⚠️' : '🚨'}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc' }}>{notif.title}</span>
+                      </div>
+                      <span style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>
+                        {new Date(notif.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    
+                    <div style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.5, marginBottom: 12 }}>
+                      {notif.message}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#94a3b8' }}>
+                      <span style={{ fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Target:</span>
+                      <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: 10 }}>
+                        {notif.schools ? notif.schools.name : 'Unknown School'}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 24px', background: 'rgba(15,23,42,0.5)', borderTop: '1px solid rgba(148,163,184,0.1)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+              <button
+                onClick={() => setShowNotifHistoryModal(false)}
                 style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, color: '#f8fafc', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}>

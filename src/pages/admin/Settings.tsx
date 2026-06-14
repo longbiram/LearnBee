@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import AdminLayout from '../../components/AdminLayout';
-import { Save, Plus, Loader2, Trash2, CheckCircle, AlertCircle, Send, Eye, EyeOff, Lock, CreditCard, Sparkles, History, Check, Calendar } from 'lucide-react';
+import { Save, Plus, Loader2, Trash2, CheckCircle, AlertCircle, Send, Eye, EyeOff, Lock, CreditCard, Sparkles, History, Check, Calendar, FileText } from 'lucide-react';
+import InvoiceModal from '../../components/InvoiceModal';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { 
@@ -2016,6 +2017,7 @@ function ChangePasswordTab() {
 
 function SubscriptionBillingTab({ schoolId }: { schoolId: string }) {
   const { profile } = useAuth();
+  const { school: schoolInfo } = useSchoolInfo(schoolId);
   const [schoolData, setSchoolData] = useState<any>(null);
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2023,6 +2025,8 @@ function SubscriptionBillingTab({ schoolId }: { schoolId: string }) {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [plans, setPlans] = useState<any[]>([]);
   const [showAllPayments, setShowAllPayments] = useState(false);
+  const [selectedPaymentForInvoice, setSelectedPaymentForInvoice] = useState<any>(null);
+  const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
 
   const SUPABASE_URL_LOCAL = import.meta.env.VITE_SUPABASE_URL as string;
   const ANON_KEY_LOCAL     = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -2337,6 +2341,7 @@ function SubscriptionBillingTab({ schoolId }: { schoolId: string }) {
                   <th style={tableHeaderStyle}>Paid On</th>
                   <th style={tableHeaderStyle}>Expires On</th>
                   <th style={tableHeaderStyle}>Status</th>
+                  <th style={tableHeaderStyle}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -2365,6 +2370,32 @@ function SubscriptionBillingTab({ schoolId }: { schoolId: string }) {
                           {isActive ? 'Active' : 'Expired'}
                         </span>
                       </td>
+                      <td style={tableCellStyle}>
+                        <button
+                          onClick={() => {
+                            setSelectedPaymentForInvoice(p);
+                            setIsInvoiceOpen(true);
+                          }}
+                          style={{
+                            background: '#eff6ff',
+                            border: 'none',
+                            color: '#2563eb',
+                            borderRadius: 8,
+                            padding: '6px 12px',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            transition: 'all 0.15s'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#dbeafe'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#eff6ff'}
+                        >
+                          <FileText size={13} /> Receipt
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -2385,15 +2416,69 @@ function SubscriptionBillingTab({ schoolId }: { schoolId: string }) {
           </div>
         )}
       </div>
+
+      {selectedPaymentForInvoice && (
+        <InvoiceModal
+          isOpen={isInvoiceOpen}
+          onClose={() => {
+            setIsInvoiceOpen(false);
+            setSelectedPaymentForInvoice(null);
+          }}
+          payment={selectedPaymentForInvoice}
+          school={schoolInfo || schoolData}
+        />
+      )}
     </div>
+
   );
 }
 
 export default function Settings() {
   const { schoolId } = useAuth();
-  const [activeTab, setActiveTab] = useState('School Profile');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(() => (location.state as any)?.tab ?? 'School Profile');
+
+  // Guided setup states
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [showFinishModal, setShowFinishModal] = useState(false);
+  const [isGuidedMode, setIsGuidedMode] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+
+  const { classes, sessions, loading: classesLoading } = useErpClasses(schoolId);
+
+  useEffect(() => {
+    if (schoolId && !classesLoading) {
+      const completed = localStorage.getItem(`erp_setup_wizard_completed_${schoolId}`);
+      if (completed !== 'true' && classes.length === 0 && sessions.length === 0) {
+        setShowWelcomeModal(true);
+      }
+    }
+  }, [schoolId, classesLoading, classes.length, sessions.length]);
 
   const tabs = ['School Profile', 'Academic Year', 'Class', 'Section', 'Subjects', 'Class Teachers', 'Classwise Fees', 'Hostel Fees', 'Salary', 'Notifications', 'Subscription & Billing', 'Security', 'Appearance', 'Change Password'];
+
+  const guideSteps = [
+    { tab: 'School Profile', title: 'Configure School Profile', emoji: '🏫', desc: 'Fill in your official school name, contact email, phone, board affiliation details, and upload your school logo. These details will print automatically on report cards and fee receipts. Make sure to click "Save Changes" at the bottom when done!' },
+    { tab: 'Academic Year', title: 'Set Up Academic Year', emoji: '📅', desc: 'Create your academic year session (e.g., 2025-2026) and specify start and end dates. Make sure to check the "Set as Current" option so all attendance, exams, and grading records default to this active session.' },
+    { tab: 'Class', title: 'Add Classes / Grades', emoji: '🏫', desc: 'Define the classes offered in your school (e.g., Nursery, 1st Grade, Grade 10). Add classes one-by-one below, and they will populate the class registry instantly. These form the base for section mappings.' },
+    { tab: 'Section', title: 'Manage Sections', emoji: '📋', desc: 'Select each class from the dropdown and assign sections (e.g., A, B, C, Science, Commerce). Assigning sections allows you to split students into batches for attendance and reporting.' },
+    { tab: 'Subjects', title: 'Map Class Subjects', emoji: '📚', desc: 'Final step! Select each class and define the list of subjects (e.g., Mathematics, English, General Science) taught in that class. Choose whether each subject is Theory, Practical, or Both.' },
+  ];
+
+  const handleTabClick = (item: string) => {
+    setActiveTab(item);
+    // Sync wizard step if they manually select any of the first 5 tabs while in guided mode
+    if (isGuidedMode) {
+      const stepIdx = guideSteps.findIndex(s => s.tab === item);
+      if (stepIdx !== -1) {
+        setCurrentStep(stepIdx);
+      } else {
+        // Paused/Exited guide if they click an unrelated tab
+        setIsGuidedMode(false);
+      }
+    }
+  };
 
   const renderTab = () => {
     if (!schoolId) return <div style={{ padding: 40, color: '#94a3b8' }}>Loading tenant context...</div>;
@@ -2422,30 +2507,368 @@ export default function Settings() {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 240px) 1fr', gap: 24 }}>
         {/* Side menu */}
         <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', padding: 12, height: 'fit-content', position: 'sticky', top: 24 }}>
-          {tabs.map((item) => (
-            <button 
-              key={item} 
-              onClick={() => setActiveTab(item)}
-              style={{ 
-                display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', borderRadius: 9, 
-                fontSize: 13, cursor: 'pointer', border: 'none', transition: 'all 0.2s',
-                color: activeTab === item ? '#7c3aed' : '#475569', 
-                background: activeTab === item ? '#f5f3ff' : 'transparent', 
-                fontWeight: activeTab === item ? 600 : 500, 
-                marginBottom: 2 
-              }}
-            >
-              {item}
-            </button>
-          ))}
+          {/* Guided Setup Manual Trigger */}
+          <button
+            onClick={() => {
+              setCurrentStep(0);
+              setActiveTab('School Profile');
+              setIsGuidedMode(true);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              width: '100%',
+              padding: '11px 14px',
+              borderRadius: 10,
+              fontSize: 13,
+              cursor: 'pointer',
+              border: 'none',
+              background: 'linear-gradient(135deg, #7c3aed, #4F8EF7)',
+              color: '#fff',
+              fontWeight: 700,
+              marginBottom: 14,
+              transition: 'all 0.2s',
+              boxShadow: '0 4px 12px rgba(124, 58, 237, 0.2)',
+              fontFamily: 'inherit'
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+          >
+            <span>✨</span> Launch Setup Wizard
+          </button>
+
+          <div style={{ borderBottom: '1px solid #f1f5f9', marginBottom: 12 }} />
+
+          {tabs.map((item) => {
+            const isGuideTab = guideSteps.some(gs => gs.tab === item);
+            const isGuidedStep = isGuidedMode && guideSteps[currentStep].tab === item;
+            
+            return (
+              <button 
+                key={item} 
+                onClick={() => handleTabClick(item)}
+                style={{ 
+                  display: 'block', 
+                  width: '100%', 
+                  textAlign: 'left', 
+                  padding: '10px 14px', 
+                  borderRadius: 9, 
+                  fontSize: 13, 
+                  cursor: 'pointer', 
+                  border: isGuidedStep ? '1px solid #c084fc' : 'none', 
+                  transition: 'all 0.2s',
+                  color: isGuidedStep ? '#7c3aed' : (activeTab === item ? '#7c3aed' : '#475569'), 
+                  background: isGuidedStep ? '#f5f3ff' : (activeTab === item ? '#f5f3ff' : 'transparent'), 
+                  fontWeight: (activeTab === item || isGuidedStep) ? 600 : 500, 
+                  marginBottom: 3,
+                  position: 'relative'
+                }}
+              >
+                {item}
+                {isGuidedMode && isGuideTab && (
+                  <span style={{ 
+                    position: 'absolute', 
+                    right: 12, 
+                    top: '50%', 
+                    transform: 'translateY(-50%)', 
+                    width: 6, 
+                    height: 6, 
+                    borderRadius: '50%', 
+                    background: guideSteps[currentStep].tab === item ? '#7c3aed' : '#cbd5e1' 
+                  }} />
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Content */}
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {isGuidedMode && currentStep >= 0 && currentStep <= 4 && (
+            <div style={{
+              background: 'linear-gradient(135deg, #f5f3ff, #eff6ff)',
+              border: '1.5px solid #c084fc',
+              borderRadius: 16,
+              padding: 20,
+              boxShadow: '0 8px 30px rgba(124, 58, 237, 0.04)',
+              position: 'relative',
+              animation: 'slideDown 0.3s ease-out'
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 800, background: '#c084fc', color: '#fff', padding: '3px 8px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Setup Step {currentStep + 1} of 5
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#7c3aed' }}>
+                  Wizard Progress: {((currentStep + 1) * 20)}%
+                </span>
+              </div>
+              
+              {/* Progress bar */}
+              <div style={{ width: '100%', height: 6, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden', marginBottom: 14 }}>
+                <div style={{ width: `${((currentStep + 1) * 20)}%`, height: '100%', background: 'linear-gradient(90deg, #7c3aed, #3b82f6)', borderRadius: 999, transition: 'width 0.4s ease' }} />
+              </div>
+              
+              {/* Instructions */}
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 26, flexShrink: 0 }}>{guideSteps[currentStep].emoji}</span>
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>
+                    {guideSteps[currentStep].title}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: 12.5, color: '#475569', lineHeight: 1.5 }}>
+                    {guideSteps[currentStep].desc}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Actions */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(226, 232, 240, 0.6)' }}>
+                <button
+                  disabled={currentStep === 0}
+                  onClick={() => {
+                    const prevStep = currentStep - 1;
+                    setCurrentStep(prevStep);
+                    setActiveTab(guideSteps[prevStep].tab);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#fff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: currentStep === 0 ? '#94a3b8' : '#475569',
+                    cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  ← Previous Step
+                </button>
+                
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <button
+                    onClick={() => setIsGuidedMode(false)}
+                    style={{
+                      padding: '8px 14px',
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit'
+                    }}
+                  >
+                    Pause Guide
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      if (currentStep === 4) {
+                        setIsGuidedMode(false);
+                        localStorage.setItem(`erp_setup_wizard_completed_${schoolId}`, 'true');
+                        setShowFinishModal(true);
+                      } else {
+                        const nextStep = currentStep + 1;
+                        setCurrentStep(nextStep);
+                        setActiveTab(guideSteps[nextStep].tab);
+                      }
+                    }}
+                    style={{
+                      padding: '8px 20px',
+                      background: '#7c3aed',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      boxShadow: '0 4px 10px rgba(124, 58, 237, 0.15)',
+                      fontFamily: 'inherit'
+                    }}
+                  >
+                    {currentStep === 4 ? 'Finish Setup 🎉' : 'Next Step →'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {renderTab()}
         </div>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* Welcome Setup Modal */}
+      {showWelcomeModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 24, width: '100%', maxWidth: 580, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden', border: '1px solid #e2e8f0', animation: 'scaleUp 0.3s ease-out' }}>
+            {/* Welcome Header */}
+            <div style={{ background: 'linear-gradient(135deg, #7c3aed, #4F8EF7)', padding: '32px 32px 24px', color: '#fff', position: 'relative' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🚀</div>
+              <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>Welcome to LearnBee ERP!</h2>
+              <p style={{ margin: '8px 0 0', fontSize: 14, color: 'rgba(255, 255, 255, 0.9)', lineHeight: 1.5 }}>
+                Let's get your school's portal initialized. We will guide you step-by-step through the first 5 essential configurations.
+              </p>
+            </div>
+            
+            {/* Step checklist */}
+            <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {[
+                { step: '1', emoji: '🏫', title: 'School Profile', desc: 'Set up school name, contact details, affiliation, and logo.' },
+                { step: '2', emoji: '📅', title: 'Academic Year', desc: 'Define your current active academic session and dates.' },
+                { step: '3', emoji: '🏫', title: 'Classes', desc: 'Create the primary and secondary standards for enrollment.' },
+                { step: '4', emoji: '📋', title: 'Sections', desc: 'Add class sections (e.g. A, B, Science).' },
+                { step: '5', emoji: '📚', title: 'Subjects', desc: 'Map subjects to classes taught in your school.' },
+              ].map((item) => (
+                <div key={item.step} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#f5f3ff', border: '1px solid #ddd6fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#7c3aed', flexShrink: 0 }}>
+                    {item.step}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>{item.emoji}</span> {item.title}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{item.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Footer actions */}
+            <div style={{ padding: '20px 32px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', background: '#fafafa' }}>
+              <button
+                onClick={() => {
+                  setShowWelcomeModal(false);
+                  localStorage.setItem(`erp_setup_wizard_completed_${schoolId}`, 'true');
+                }}
+                style={{ padding: '10px 18px', background: 'none', border: 'none', color: '#64748b', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                Skip & Configure Later
+              </button>
+              
+              <button
+                onClick={() => {
+                  setShowWelcomeModal(false);
+                  setIsGuidedMode(true);
+                  setCurrentStep(0);
+                  setActiveTab('School Profile');
+                }}
+                style={{
+                  padding: '12px 28px',
+                  background: '#7c3aed',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 12,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  boxShadow: '0 4px 14px rgba(124, 58, 237, 0.25)',
+                  transition: 'all 0.2s',
+                  fontFamily: 'inherit'
+                }}
+              >
+                Start Setup Wizard 🚀
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Celebration Finish Modal */}
+      {showFinishModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 24, width: '100%', maxWidth: 500, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden', border: '1px solid #e2e8f0', textAlign: 'center', animation: 'scaleUp 0.3s ease-out' }}>
+            <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', padding: '40px 20px 30px', color: '#fff' }}>
+              <div style={{ fontSize: 56, marginBottom: 12, animation: 'bounce 1s infinite' }}>🎉</div>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Congratulations!</h2>
+              <p style={{ margin: '8px 0 0', fontSize: 13, color: 'rgba(255, 255, 255, 0.9)' }}>
+                Your school ERP initial setup is now 100% complete!
+              </p>
+            </div>
+            
+            <div style={{ padding: '24px 32px' }}>
+              <p style={{ margin: 0, fontSize: 13, color: '#475569', lineHeight: 1.6 }}>
+                You have successfully configured the core building blocks: School Profile, Academic Sessions, Classes, Sections, and Subjects.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '20px 0', padding: '16px', background: '#f8fafc', borderRadius: 12, border: '1px solid #f1f5f9', textAlign: 'left' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recommended Next Steps:</div>
+                <div style={{ fontSize: 13, color: '#334155' }}>👩‍🏫 **Add Teachers & Staff** to assign subjects & duties.</div>
+                <div style={{ fontSize: 13, color: '#334155' }}>🎓 **Register Students** into their respective classes.</div>
+                <div style={{ fontSize: 13, color: '#334155' }}>💰 **Set Class Fees** under advanced billing settings.</div>
+              </div>
+            </div>
+            
+            <div style={{ padding: '0 32px 32px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                onClick={() => {
+                  setShowFinishModal(false);
+                  navigate('/school-admin');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: '#059669',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 12,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+                  fontFamily: 'inherit'
+                }}
+              >
+                Go to Admin Dashboard 🚀
+              </button>
+              
+              <button
+                onClick={() => setShowFinishModal(false)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#64748b',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit'
+                }}
+              >
+                Stay on Settings Page
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes scaleUp {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </AdminLayout>
   );
 }

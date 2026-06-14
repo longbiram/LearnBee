@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback,useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -141,6 +141,26 @@ export default function TeacherLayout({ children, pageTitle, pageSubtitle }: {
   useEffect(() => {
     if (searchOpen) setTimeout(() => searchRef.current?.focus(), 50);
   }, [searchOpen]);
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    const results: { label: string; to: string; icon: any }[] = [];
+    
+    navItems.forEach(item => {
+      if (item.to && item.label.toLowerCase().includes(q)) {
+        results.push({ label: item.label, to: item.to, icon: item.icon });
+      }
+      if (item.children) {
+        item.children.forEach(child => {
+          if (child.label.toLowerCase().includes(q) || item.label.toLowerCase().includes(q)) {
+            results.push({ label: `${item.label} > ${child.label}`, to: child.to, icon: item.icon });
+          }
+        });
+      }
+    });
+    return results;
+  }, [searchQuery]);
 
   const toggleNav = (label: string) => setOpenNav(prev => (prev === label ? null : label));
   const isActive  = (to: string)   => location.pathname === to || (to === '/teacher' && location.pathname === '/teacher/');
@@ -299,42 +319,73 @@ export default function TeacherLayout({ children, pageTitle, pageSubtitle }: {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
 
               {/* ── Search ── */}
-              <AnimatePresence mode="wait">
-                {searchOpen ? (
-                  <motion.div
-                    key="search-open"
-                    initial={{ width: 0, opacity: 0 }}
-                    animate={{ width: 220, opacity: 1 }}
-                    exit={{ width: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: 10, padding: '0 12px', height: 38, overflow: 'hidden' }}
-                  >
-                    <Search size={14} color="#94a3b8" style={{ flexShrink: 0 }} />
-                    <input
-                      ref={searchRef}
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      placeholder="Search..."
-                      style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: 13, color: '#1e293b', fontFamily: 'inherit', padding: '0 8px' }}
-                    />
-                    <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 0 }}>
-                      <X size={14} color="#94a3b8" />
-                    </button>
-                  </motion.div>
-                ) : (
-                  <motion.button
-                    key="search-closed"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    onClick={() => setSearchOpen(true)}
-                    style={{ width: 38, height: 38, borderRadius: 10, background: '#f1f5f9', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
-                    onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
-                  >
-                    <Search size={17} color="#64748b" />
-                  </motion.button>
+              <div style={{ position: 'relative' }}>
+                <AnimatePresence mode="wait">
+                  {searchOpen ? (
+                    <motion.div
+                      key="search-open"
+                      initial={{ width: 0, opacity: 0 }}
+                      animate={{ width: 220, opacity: 1 }}
+                      exit={{ width: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      style={{ position: 'relative', display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: 10, padding: '0 12px', height: 38 }}
+                    >
+                      <Search size={14} color="#94a3b8" style={{ flexShrink: 0 }} />
+                      <input
+                        ref={searchRef}
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        placeholder="Search..."
+                        style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: 13, color: '#1e293b', fontFamily: 'inherit', padding: '0 8px', minWidth: 0 }}
+                      />
+                      <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 0 }}>
+                        <X size={14} color="#94a3b8" />
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.button
+                      key="search-closed"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      onClick={() => setSearchOpen(true)}
+                      style={{ width: 38, height: 38, borderRadius: 10, background: '#f1f5f9', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
+                    >
+                      <Search size={17} color="#64748b" />
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+
+                {/* Dropdown outside animated container to prevent clipping */}
+                {searchOpen && searchQuery.trim() && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 280, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 10px 40px rgba(0,0,0,0.12)', zIndex: 300, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: 300 }}>
+                    <div style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9', fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Search Results</div>
+                    <div style={{ overflowY: 'auto' }}>
+                      {searchResults.length === 0 ? (
+                        <div style={{ padding: '20px 14px', textAlign: 'center', fontSize: 13, color: '#64748b' }}>No matches found</div>
+                      ) : (
+                        searchResults.map((res, i) => {
+                          const Icon = res.icon;
+                          return (
+                            <Link
+                              key={i}
+                              to={res.to}
+                              onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid #f8fafc', textDecoration: 'none', color: '#1e293b', transition: 'background 0.15s' }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                              onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                            >
+                              <Icon size={16} color="#8B5CF6" style={{ flexShrink: 0 }} />
+                              <span style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{res.label}</span>
+                            </Link>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
                 )}
-              </AnimatePresence>
+              </div>
 
               {/* ── Notifications ── */}
               <div ref={notifRef} style={{ position: 'relative' }}>

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -80,6 +80,26 @@ export default function SuperAdminLayout({ children, pageTitle, pageSubtitle }: 
     }
     return null;
   };
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    const results: { label: string; to: string; icon: any }[] = [];
+    
+    navItems.forEach(item => {
+      if (item.to && item.label.toLowerCase().includes(q)) {
+        results.push({ label: item.label, to: item.to, icon: item.icon });
+      }
+      if (item.children) {
+        item.children.forEach(child => {
+          if (child.label.toLowerCase().includes(q) || item.label.toLowerCase().includes(q)) {
+            results.push({ label: `${item.label} > ${child.label}`, to: child.to, icon: item.icon });
+          }
+        });
+      }
+    });
+    return results;
+  }, [searchQuery]);
 
   const parentLabel = getParentLabel(location.pathname);
   const [openNav, setOpenNav] = useState<string | null>(parentLabel ?? null);
@@ -239,42 +259,73 @@ export default function SuperAdminLayout({ children, pageTitle, pageSubtitle }: 
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               {/* ── Search ── */}
-              <AnimatePresence mode="wait">
-                {searchOpen ? (
-                  <motion.div
-                    key="search-open"
-                    initial={{ width: 0, opacity: 0 }}
-                    animate={{ width: 260, opacity: 1 }}
-                    exit={{ width: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    style={{ display: 'flex', alignItems: 'center', background: '#0f172a', border: '1px solid #334155', borderRadius: 12, padding: '0 14px', height: 42, overflow: 'hidden' }}
-                  >
-                    <Search size={16} color="#94a3b8" style={{ flexShrink: 0 }} />
-                    <input
-                      ref={searchRef}
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      placeholder="Search schools, users, plans..."
-                      style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: 14, color: '#f8fafc', fontFamily: 'inherit', padding: '0 10px' }}
-                    />
-                    <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 0 }}>
-                      <X size={16} color="#94a3b8" />
-                    </button>
-                  </motion.div>
-                ) : (
-                  <motion.button
-                    key="search-closed"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    onClick={() => setSearchOpen(true)}
-                    style={{ width: 42, height: 42, borderRadius: 12, background: '#0f172a', border: '1px solid #334155', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#475569'; e.currentTarget.style.background = '#1e293b'; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.background = '#0f172a'; }}
-                  >
-                    <Search size={18} color="#94a3b8" />
-                  </motion.button>
+              <div style={{ position: 'relative' }}>
+                <AnimatePresence mode="wait">
+                  {searchOpen ? (
+                    <motion.div
+                      key="search-open"
+                      initial={{ width: 0, opacity: 0 }}
+                      animate={{ width: 260, opacity: 1 }}
+                      exit={{ width: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      style={{ position: 'relative', display: 'flex', alignItems: 'center', background: '#0f172a', border: '1px solid #334155', borderRadius: 12, padding: '0 14px', height: 42 }}
+                    >
+                      <Search size={16} color="#94a3b8" style={{ flexShrink: 0 }} />
+                      <input
+                        ref={searchRef}
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        placeholder="Search schools, users, plans..."
+                        style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: 14, color: '#f8fafc', fontFamily: 'inherit', padding: '0 10px', minWidth: 0 }}
+                      />
+                      <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 0 }}>
+                        <X size={16} color="#94a3b8" />
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.button
+                      key="search-closed"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      onClick={() => setSearchOpen(true)}
+                      style={{ width: 42, height: 42, borderRadius: 12, background: '#0f172a', border: '1px solid #334155', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#475569'; e.currentTarget.style.background = '#1e293b'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.background = '#0f172a'; }}
+                    >
+                      <Search size={18} color="#94a3b8" />
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+
+                {/* Dropdown outside animated container to prevent clipping */}
+                {searchOpen && searchQuery.trim() && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: 300, background: '#1e293b', border: '1px solid #334155', borderRadius: 12, boxShadow: '0 10px 40px rgba(0,0,0,0.3)', zIndex: 300, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: 300 }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #334155', fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Search Results</div>
+                    <div style={{ overflowY: 'auto' }}>
+                      {searchResults.length === 0 ? (
+                        <div style={{ padding: '20px 16px', textAlign: 'center', fontSize: 13, color: '#64748b' }}>No matches found</div>
+                      ) : (
+                        searchResults.map((res, i) => {
+                          const Icon = res.icon;
+                          return (
+                            <Link
+                              key={i}
+                              to={res.to}
+                              onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.02)', textDecoration: 'none', color: '#f8fafc', transition: 'background 0.15s' }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            >
+                              <Icon size={16} color="#818cf8" style={{ flexShrink: 0 }} />
+                              <span style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{res.label}</span>
+                            </Link>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
                 )}
-              </AnimatePresence>
+              </div>
 
               {/* ── Admin Profile ── */}
               <div ref={profileRef} style={{ position: 'relative' }}>

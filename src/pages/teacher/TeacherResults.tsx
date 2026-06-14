@@ -129,23 +129,21 @@ export default function TeacherResults() {
       }
       
       let overridesSaved = false;
-      if (isClassTeacher) {
-        const resultPromises = classStudents.map((st: any) => {
-          const ov = resultOverrides[st.id] || { remarks: '', result: '' };
-          if (ov.remarks || ov.result) {
-            return upsertStudentResult({
-              school_id: schoolId,
-              exam_id: selectedExamId,
-              student_id: st.id,
-              custom_remarks: ov.remarks || undefined,
-              custom_result: ov.result || undefined,
-            });
-          }
-          return Promise.resolve();
-        });
-        await Promise.all(resultPromises);
-        overridesSaved = true;
-      }
+      const resultPromises = classStudents.map((st: any) => {
+        const ov = resultOverrides[st.id] || { remarks: '', result: '' };
+        if (ov.remarks || ov.result) {
+          return upsertStudentResult({
+            school_id: schoolId,
+            exam_id: selectedExamId,
+            student_id: st.id,
+            custom_remarks: ov.remarks || undefined,
+            custom_result: ov.result || undefined,
+          });
+        }
+        return Promise.resolve();
+      });
+      await Promise.all(resultPromises);
+      overridesSaved = true;
 
       if (!marksSaved && !overridesSaved && marksData.length === 0) {
         setSaving(false);
@@ -220,12 +218,8 @@ export default function TeacherResults() {
                     </th>
                   ))}
                   <th style={thStyle}>Absent</th>
-                  {isClassTeacher && (
-                    <>
-                      <th style={{ ...thStyle, minWidth: 140 }}>Remarks</th>
-                      <th style={{ ...thStyle, minWidth: 140 }}>Result</th>
-                    </>
-                  )}
+                  <th style={{ ...thStyle, minWidth: 140 }}>Remarks</th>
+                  <th style={{ ...thStyle, minWidth: 140 }}>Result</th>
                 </tr>
               </thead>
               <tbody>
@@ -249,7 +243,7 @@ export default function TeacherResults() {
                       const ed = getEdit(st.id, sub.subject_id);
                       const isAbsent = ed.absent;
                       const isLocked = selectedExam.status === 'locked';
-                      const isOtherUser = ed.entered_by && ed.entered_by !== profile?.id && ed.entered_by !== myStaffId && !isClassTeacher;
+                      const isOtherUser = ed.entered_by && ed.entered_by !== profile?.id && ed.entered_by !== myStaffId;
                       
                       return (
                         <td key={sub.subject_id} style={{ ...tdStyle, padding: '8px 12px' }}>
@@ -267,38 +261,26 @@ export default function TeacherResults() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                 <span style={{ fontSize: 10, color: '#94a3b8', width: 14 }}>T</span>
-                                {isOtherUser ? (
-                                    <span style={{ display: 'inline-block', width: 60, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{ed.theory === '' ? '—' : ed.theory}</span>
-                                ) : (
-                                    <input type="number" value={ed.theory} min={0} max={sub.max_theory} disabled={isLocked}
-                                      onChange={e => setEdit(st.id, sub.subject_id, 'theory', e.target.value)}
-                                      style={{ ...markInput, width: 60 }} placeholder="—" />
-                                )}
+                                <input type="number" value={ed.theory} min={0} max={sub.max_theory} disabled={isLocked}
+                                  onChange={e => setEdit(st.id, sub.subject_id, 'theory', e.target.value)}
+                                  style={{ ...markInput, width: 60 }} placeholder="—" />
                                 <span style={{ fontSize: 10, color: '#94a3b8' }}>/{sub.max_theory}</span>
                               </div>
                               {sub.max_practical != null && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                   <span style={{ fontSize: 10, color: '#94a3b8', width: 14 }}>P</span>
-                                  {isOtherUser ? (
-                                      <span style={{ display: 'inline-block', width: 60, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{ed.practical === '' ? '—' : ed.practical}</span>
-                                  ) : (
-                                      <input type="number" value={ed.practical} min={0} max={sub.max_practical} disabled={isLocked}
-                                        onChange={e => setEdit(st.id, sub.subject_id, 'practical', e.target.value)}
-                                        style={{ ...markInput, width: 60 }} placeholder="—" />
-                                  )}
+                                  <input type="number" value={ed.practical} min={0} max={sub.max_practical} disabled={isLocked}
+                                    onChange={e => setEdit(st.id, sub.subject_id, 'practical', e.target.value)}
+                                    style={{ ...markInput, width: 60 }} placeholder="—" />
                                   <span style={{ fontSize: 10, color: '#94a3b8' }}>/{sub.max_practical}</span>
                                 </div>
                               )}
                               {sub.max_internal != null && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                   <span style={{ fontSize: 10, color: '#94a3b8', width: 14 }}>IA</span>
-                                  {isOtherUser ? (
-                                      <span style={{ display: 'inline-block', width: 60, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{ed.internal === '' ? '—' : ed.internal}</span>
-                                  ) : (
-                                      <input type="number" value={ed.internal} min={0} max={sub.max_internal} disabled={isLocked}
-                                        onChange={e => setEdit(st.id, sub.subject_id, 'internal', e.target.value)}
-                                        style={{ ...markInput, width: 60 }} placeholder="—" />
-                                  )}
+                                  <input type="number" value={ed.internal} min={0} max={sub.max_internal} disabled={isLocked}
+                                    onChange={e => setEdit(st.id, sub.subject_id, 'internal', e.target.value)}
+                                    style={{ ...markInput, width: 60 }} placeholder="—" />
                                   <span style={{ fontSize: 10, color: '#94a3b8' }}>/{sub.max_internal}</span>
                                 </div>
                               )}
@@ -317,10 +299,7 @@ export default function TeacherResults() {
                       {(() => {
                           const firstSubId = selectedExam.subjects_config[0]?.subject_id ?? '';
                           const ed = getEdit(st.id, firstSubId);
-                          const isOther = ed.entered_by && ed.entered_by !== profile?.id;
-                          return isOther ? (
-                              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>🔒</div>
-                          ) : (
+                          return (
                               <input type="checkbox"
                                 checked={ed.absent || false}
                                 disabled={selectedExam.status === 'locked'}
@@ -334,37 +313,35 @@ export default function TeacherResults() {
                           );
                       })()}
                     </td>
-                    {isClassTeacher && (
-                      <>
-                        {/* Remarks */}
-                        <td style={{ ...tdStyle, padding: '8px 12px' }}>
-                          <input 
-                            value={resultOverrides[st.id]?.remarks ?? ''}
-                            onChange={e => setResultOverrides(prev => ({ ...prev, [st.id]: { ...prev[st.id], remarks: e.target.value } }))}
-                            placeholder="Add remarks…"
-                            disabled={selectedExam.status === 'locked'}
-                            style={{ ...markInput, width: 130, fontSize: 11, padding: '5px 8px' }}
-                          />
-                        </td>
-                        {/* Result */}
-                        <td style={{ ...tdStyle, padding: '8px 12px' }}>
-                          <select
-                            value={resultOverrides[st.id]?.result ?? ''}
-                            onChange={e => setResultOverrides(prev => ({ ...prev, [st.id]: { ...prev[st.id], result: e.target.value } }))}
-                            disabled={selectedExam.status === 'locked'}
-                            style={{ ...markInput, width: 130, fontSize: 11, padding: '5px 8px', cursor: 'pointer' }}
-                          >
-                            <option value="">Auto-detect</option>
-                            <option value="PASS">PASS</option>
-                            <option value="FAIL">FAIL</option>
-                            <option value="PROMOTED">PROMOTED</option>
-                            <option value="NOT PROMOTED">NOT PROMOTED</option>
-                            <option value="DETAINED">DETAINED</option>
-                            <option value="RESULT WITHHELD">RESULT WITHHELD</option>
-                          </select>
-                        </td>
-                      </>
-                    )}
+                    <>
+                      {/* Remarks */}
+                      <td style={{ ...tdStyle, padding: '8px 12px' }}>
+                        <input 
+                          value={resultOverrides[st.id]?.remarks ?? ''}
+                          onChange={e => setResultOverrides(prev => ({ ...prev, [st.id]: { ...prev[st.id], remarks: e.target.value } }))}
+                          placeholder="Add remarks…"
+                          disabled={selectedExam.status === 'locked'}
+                          style={{ ...markInput, width: 130, fontSize: 11, padding: '5px 8px' }}
+                        />
+                      </td>
+                      {/* Result */}
+                      <td style={{ ...tdStyle, padding: '8px 12px' }}>
+                        <select
+                          value={resultOverrides[st.id]?.result ?? ''}
+                          onChange={e => setResultOverrides(prev => ({ ...prev, [st.id]: { ...prev[st.id], result: e.target.value } }))}
+                          disabled={selectedExam.status === 'locked'}
+                          style={{ ...markInput, width: 130, fontSize: 11, padding: '5px 8px', cursor: 'pointer' }}
+                        >
+                          <option value="">Auto-detect</option>
+                          <option value="PASS">PASS</option>
+                          <option value="FAIL">FAIL</option>
+                          <option value="PROMOTED">PROMOTED</option>
+                          <option value="NOT PROMOTED">NOT PROMOTED</option>
+                          <option value="DETAINED">DETAINED</option>
+                          <option value="RESULT WITHHELD">RESULT WITHHELD</option>
+                        </select>
+                      </td>
+                    </>
                   </tr>
                 ))}
               </tbody>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../../../components/AdminLayout';
-import { Save, X, Loader2, AlertCircle, User, UserCheck, KeyRound, GraduationCap } from 'lucide-react';
+import { Save, X, Loader2, AlertCircle, User, UserCheck, KeyRound, GraduationCap, Users, Crown } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCreateStudent } from '../../../hooks/useErpStudents';
 import { useErpClasses } from '../../../hooks/useErpClasses';
@@ -46,6 +46,12 @@ function FilePreview({ file }: { file: File }) {
   );
 }
 
+interface StudentLimit {
+  current: number;
+  max: number | null;
+  planName: string;
+}
+
 export default function AddStudent() {
   const navigate = useNavigate();
   const { schoolId } = useAuth();
@@ -55,6 +61,57 @@ export default function AddStudent() {
   const [successData, setSuccessData] = useState<{ name: string; admNo: string; authCreated: boolean; authError?: string } | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ── Subscription limit state ─────────────────────────
+  const [studentLimit, setStudentLimit] = useState<StudentLimit | null>(null);
+  const [limitLoading, setLimitLoading] = useState(true);
+
+  useEffect(() => {
+    if (!schoolId) return;
+    const fetchStudentLimit = async () => {
+      setLimitLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        // Count students via edge function
+        const { data: studentsData } = await supabase.functions.invoke('erp-students', {
+          body: { method: 'getStudents', payload: { school_id: schoolId } },
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const currentCount = Array.isArray(studentsData) ? studentsData.length : 0;
+
+        // Fetch school's plan slug
+        const { data: schoolData } = await supabase
+          .from('schools')
+          .select('subscription_plan')
+          .eq('id', schoolId)
+          .single();
+
+        if (schoolData?.subscription_plan) {
+          const { data: planData } = await supabase
+            .from('subscription_plans')
+            .select('max_students, name')
+            .eq('slug', schoolData.subscription_plan)
+            .single();
+
+          setStudentLimit({
+            current: currentCount,
+            max: planData?.max_students ?? null,
+            planName: planData?.name ?? schoolData.subscription_plan,
+          });
+        } else {
+          setStudentLimit({ current: currentCount, max: null, planName: 'Starter' });
+        }
+      } catch (err) {
+        console.error('Failed to fetch student limit:', err);
+        setStudentLimit(null);
+      } finally {
+        setLimitLoading(false);
+      }
+    };
+    fetchStudentLimit();
+  }, [schoolId]);
   const [documents, setDocuments] = useState<{
     birthCert: File | null;
     casteCert: File | null;
@@ -79,9 +136,16 @@ export default function AddStudent() {
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
   const selectedClass = classes.find(c => c.id === form.current_class_id);
 
+  // Derived limit helpers
+  const isAtLimit = studentLimit !== null && studentLimit.max !== null && studentLimit.current >= studentLimit.max;
+  const limitPct = studentLimit?.max ? Math.min(100, Math.round((studentLimit.current / studentLimit.max) * 100)) : 0;
+  const limitColor = limitPct >= 100 ? '#dc2626' : limitPct >= 80 ? '#f59e0b' : '#7c3aed';
+  const limitBg   = limitPct >= 100 ? '#fee2e2' : limitPct >= 80 ? '#fef3c7' : '#ede9fe';
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!schoolId) { setToast({ type: 'error', msg: 'School not configured. Please contact support.' }); return; }
+    if (isAtLimit) { setToast({ type: 'error', msg: `Student limit reached for your ${studentLimit?.planName ?? ''} plan. Please upgrade to add more students.` }); return; }
 
     setIsSubmitting(true);
     setToast(null);
@@ -146,6 +210,94 @@ export default function AddStudent() {
 
   return (
     <AdminLayout pageTitle="Add New Student" pageSubtitle="Register a new student into the system">
+
+      {/* ── Subscription Usage Banner ─────────────────────────── */}
+      {!limitLoading && studentLimit !== null && (
+        <div style={{
+          marginBottom: 22,
+          background: '#fff',
+          border: `1px solid ${limitColor}30`,
+          borderRadius: 16,
+          padding: '18px 22px',
+          boxShadow: `0 0 0 4px ${limitBg}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: limitBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Users size={18} color={limitColor} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+                  {studentLimit.max === null ? 'Unlimited Students' : `Student Slots — ${studentLimit.planName} Plan`}
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 1 }}>
+                  {studentLimit.max === null
+                    ? `${studentLimit.current.toLocaleString()} students enrolled — no limit on your current plan`
+                    : isAtLimit
+                      ? `⚠️ Limit reached · ${studentLimit.current} / ${studentLimit.max} students used`
+                      : `${studentLimit.current.toLocaleString()} of ${studentLimit.max.toLocaleString()} student slots used`}
+                </div>
+              </div>
+            </div>
+            {studentLimit.max !== null && (
+              <div style={{
+                padding: '4px 14px', borderRadius: 20, fontSize: 13, fontWeight: 700,
+                background: limitBg, color: limitColor,
+              }}>
+                {limitPct}%
+              </div>
+            )}
+          </div>
+
+          {studentLimit.max !== null && (
+            <div>
+              <div style={{ height: 8, background: '#f1f5f9', borderRadius: 999, overflow: 'hidden', marginBottom: 6 }}>
+                <div style={{
+                  height: '100%',
+                  width: `${limitPct}%`,
+                  background: limitPct >= 100
+                    ? 'linear-gradient(90deg, #f87171, #dc2626)'
+                    : limitPct >= 80
+                      ? 'linear-gradient(90deg, #fbbf24, #f59e0b)'
+                      : 'linear-gradient(90deg, #a78bfa, #7c3aed)',
+                  borderRadius: 999,
+                  transition: 'width 0.6s ease',
+                }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8' }}>
+                <span>{studentLimit.current} enrolled</span>
+                <span>{Math.max(0, studentLimit.max - studentLimit.current)} slots remaining</span>
+              </div>
+            </div>
+          )}
+
+          {isAtLimit && (
+            <div style={{
+              marginTop: 14, padding: '12px 16px',
+              background: 'linear-gradient(135deg, #fef2f2, #fff1f2)',
+              border: '1px solid #fca5a5', borderRadius: 12,
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              <Crown size={18} color="#dc2626" style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', marginBottom: 2 }}>Student limit reached</div>
+                <div style={{ fontSize: 12, color: '#b91c1c' }}>Upgrade your plan to add more students.</div>
+              </div>
+              <button
+                type="button"
+              onClick={() => navigate('/school-admin/settings', { state: { tab: 'Subscription & Billing' } })}
+                style={{
+                  padding: '7px 16px', background: '#dc2626', border: 'none', borderRadius: 8,
+                  color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >
+                Upgrade Plan
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Error Toast */}
       {toast && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderRadius: 12, marginBottom: 18, background: '#fee2e2', border: '1px solid #fca5a5' }}>
@@ -274,8 +426,20 @@ export default function AddStudent() {
           <button type="button" onClick={() => navigate('/school-admin/students')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: '#f1f5f9', border: 'none', borderRadius: 10, fontSize: 14, color: '#475569', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
             <X size={15} /> Cancel
           </button>
-          <button type="submit" disabled={saving || isSubmitting} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 24px', background: (saving || isSubmitting) ? '#a78bfa' : '#7c3aed', border: 'none', borderRadius: 10, fontSize: 14, color: '#fff', cursor: (saving || isSubmitting) ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
-            {(saving || isSubmitting) ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {isSubmitting ? 'Uploading & Saving…' : 'Saving…'}</> : <><Save size={14} /> Save Student</>}
+          <button
+            type="submit"
+            disabled={saving || isSubmitting || isAtLimit}
+            title={isAtLimit ? `Student limit reached for your ${studentLimit?.planName} plan. Upgrade to add more students.` : undefined}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '10px 24px',
+              background: isAtLimit ? '#94a3b8' : (saving || isSubmitting) ? '#a78bfa' : '#7c3aed',
+              border: 'none', borderRadius: 10, fontSize: 14, color: '#fff',
+              cursor: (saving || isSubmitting || isAtLimit) ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit', fontWeight: 700,
+              opacity: isAtLimit ? 0.7 : 1,
+            }}
+          >
+            {(saving || isSubmitting) ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {isSubmitting ? 'Uploading & Saving…' : 'Saving…'}</> : isAtLimit ? <><Crown size={14} /> Limit Reached</> : <><Save size={14} /> Save Student</>}
           </button>
         </div>
       </form>
