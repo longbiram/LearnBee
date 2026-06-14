@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Play, ArrowRight, Users, BookOpen, BarChart3, DollarSign } from 'lucide-react';
+import { ArrowRight, Users, BookOpen, BarChart3, DollarSign } from 'lucide-react';
 import ParticleBackground from './ParticleBackground';
 
 const floatingCards = [

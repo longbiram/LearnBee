@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Users, BookOpen, Calendar, ChevronRight, CreditCard, Layout, FileText, Settings, Bell, ClipboardList, UserCheck, Shield } from 'lucide-react';
+import { Users, Calendar, ChevronRight, CreditCard, Layout, FileText, Settings, Bell, ClipboardList, UserCheck, Shield } from 'lucide-react';
 import PageLayout from '../components/PageLayout';
 
 const guideModules = [
